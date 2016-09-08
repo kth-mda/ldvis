@@ -9,8 +9,21 @@ input {
   width: 100%;
 }
 
+.list {
+  overflow: auto;
+  background-color: #eee;
+}
+
+table {
+  background-color: #ddd;
+}
+
 table tr td {
   background-color: #eee;
+}
+
+table tr.selected td {
+  background-color: #aaa;
 }
 
 #ui {
@@ -34,16 +47,12 @@ table tr td {
   text-align: right;
 }
 
-.list {
-  overflow: auto;
-}
-
 #rightcol {
   min-width: 10em;
 }
 
 .gutter {
-  background-color: #eee;
+  background-color: #444;
 
   background-repeat: no-repeat;
   background-position: 50%;

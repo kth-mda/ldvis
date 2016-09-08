@@ -7,6 +7,7 @@
     "start": "opener http://localhost:3012 && node server.js",
     "dev": "opener http://localhost:3012 && nodemon --watch server.js server.js"
   },
+  "repository": "git@github.com:FindOut/ldexplorer.git",
   "author": "dag.rende@find-out.se",
   "devDependencies": {
     "babel-core": "^6.7.7",
