@@ -1,10 +1,21 @@
+require('jquery-ui/themes/base/core.css');
+require('jquery-ui/themes/base/menu.css');
+// require('jquery-ui/themes/base/theme.css');
 import $ from 'jquery';
+let draggable = require('jquery-ui/ui/widgets/draggable');
+draggable();
+
 import Split from 'split.js';
-import * as d3 from './d3';
 import RdfXmlParser from 'rdf-parser-rdfxml';
 import _ from 'lodash';
+import {
+  d3, SvgComponent, SimpleTextBoxComponent, HierarchyComponent, HBoxLayout, VBoxLayout, XyLayout, Manipulator,
+  MoveNodeTool, CreateMoveRelationTool, SelectTool, utils
+} from '../../../../../fomod-develop';
+import d3ctx from 'd3-context-menu';
 
-let initialServerUrl = 'https://vservices.offis.de/rtp/fuseki/v1.0/ldr/query';
+// let initialServerUrl = 'https://vservices.offis.de/rtp/fuseki/v1.0/ldr/query';
+let initialServerUrl = 'http://localhost:8080/openrdf-sesame/repositories/scania';
 
 var parser = new RdfXmlParser();
 parser.rdf.prefixes['rdf'] = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
@@ -15,6 +26,26 @@ parser.rdf.prefixes['simulink_services'] = 'https://vservices.offis.de/rtp/simul
 parser.rdf.prefixes['foaf'] = 'http://xmlns.com/foaf/0.1/';
 parser.rdf.prefixes['oslc_am'] = 'http://open-services.net/ns/am#';
 //parser.rdf.prefixes['xxx'] = 'xxx';
+
+let contextMenu = d3ctx(d3);
+
+let menu = [
+    {
+        title: 'Item #1',
+        action: function(elm, d, i) {
+            console.log('Item #1 clicked!');
+            console.log('The data for this circle is: ' + d);
+        },
+        disabled: false // optional, defaults to false
+    },
+    {
+        title: 'Item #2',
+        action: function(elm, d, i) {
+            console.log('You have clicked the second item!');
+            console.log('The data for this circle is: ' + d);
+        }
+    }
+];
 
 // returns uri shrinked by using prefix form for defined prefixes
 // if uri has the form <xxxyyy> then the prefixed form is prefix:yyy
@@ -72,11 +103,20 @@ limit 1000`).then(function(data) {
   let trEnter = tr.enter().append('tr').on('click', rowClickHandler('#type-list', showObjectsOfType));
   trEnter.append('td').text(d => shrinkResultUri(d['?type']));
   trEnter.append('td').text(d => d['?cnt']);
+  trEnter.on('contextmenu', contextMenu(menu));
+
 });
+
+function getPositions(ev) {
+  let result = {};
+  for (let prefix of ['client', 'offset', 'page', 'screen']) {
+    result[prefix] = [ev[prefix + 'X'], ev[prefix + 'Y']];
+  }
+  return result;
+}
 
 // handle object list
 function showObjectsOfType(types) {
-  console.log('showObjectsOfType(',types,')');
   if (types.length === 1) {
     let query = `select ?obj
     where {graph ?g {
@@ -91,9 +131,11 @@ function showObjectsOfType(types) {
       let tr = d3.select('#object-list table').selectAll('tr')
         .data(data, d => d['?obj']);
       tr.exit().remove();
-        console.log('tr',tr);
       let trEnter = tr.enter().append('tr').on('click', rowClickHandler('#object-list', uri => showObjectDetails(uri[0]['?obj'])));
       trEnter.append('td').text(d => shrinkResultUri(d['?obj']));
+      $('#object-list td').draggable({helper: "clone", stop: function( event, ui ) {
+        addDiagramObject(d3.select(event.target).datum()['?obj'], event.clientX, event.clientY);
+      }});
     });
   }
 }
@@ -114,19 +156,69 @@ function showObjectDetails(uri) {
     let tr = d3.select('#object-details table').selectAll('tr')
       .data(data, d => d['?r']);
     tr.exit().remove();
-      console.log('tr',tr);
     let trEnter = tr.enter().append('tr');
     trEnter.append('td').text(d => shrinkResultUri(d['?r']));
     trEnter.append('td').text(d => shrinkResultUri(d['?o']));
   });
 }
 
-// deselect all elements nside
+// handle diagram
+let nodes = [];
+let diagram = parser.rdf.createGraph();
+let svgComponent = new SvgComponent('top').layout(new XyLayout());
+let nodeComponent = new SimpleTextBoxComponent('obj', d => [d.text]).dataId(d=>d.text);
+
+function getChildren(parent, data) {
+  if (parent) {
+    return [];
+  } else {
+    return nodes;
+  }
+}
+
+function getComponent(dataItem) {
+  return nodeComponent;
+}
+
+let hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
+
+let manipulator = new Manipulator()
+.add(new MoveNodeTool()
+  .on('end', (sourceEls, targetEl, targetRelPosList) => {
+      sourceEls.each(function(d, i) {
+        d.x = targetRelPosList[i].x;
+        d.y = targetRelPosList[i].y;
+      });
+      renderAll();
+  }))
+.add(new SelectTool());
+
+function renderAll() {
+  let svg = svgComponent(d3.select('#rightcol'));
+  hierarchyComponent(svg, graph);
+  d3.selectAll('#rightcol .node').on('contextmenu', contextMenu(menu));
+  svgComponent.layout()(d3.select('#rightcol svg'));
+
+  d3.selectAll('#rightcol .node').call(manipulator);
+}
+renderAll();
+
+// adds a new diagramobject with representing uri at document pos x, y
+function addDiagramObject(uri, x, y) {
+  let svgBounds = d3.select('svg').node().getBoundingClientRect();
+  nodes.push({id: uri, text: shrinkResultUri(uri), x: x - svgBounds.left, y: y - svgBounds.top});
+  renderAll();
+}
+
+
+
+
+// deselect all elements inside parentElement
 function deselectAll(parentElement) {
   parentElement.selectAll('.selected').classed('selected', false);
 }
 
-// get data elements for all selected elements inside d3 selection parentElement
+// get data elements for all selected elements inside parentElement
 function getSelected(parentElement) {
   return parentElement.selectAll('.selected').data();
 }
@@ -151,6 +243,7 @@ function rowClickHandler(tableSelector, selectionChanged) {
   }
 }
 
+// returns a promise with tsv data from result of sparql execution on server at serverUrl
 function loadSparqlTsv(serverUrl, sparql) {
   return new Promise(function(fulfill, reject) {
     let url = fusekiUrl(sparql);
@@ -170,45 +263,3 @@ function loadSparqlTsv(serverUrl, sparql) {
     }
   });
 }
-
-// import * as d3 from './modeling/d3';
-// import {
-//   SvgComponent, HBoxLayout, VBoxLayout, HierarchyComponent, Manipulator,
-//   MoveNodeTool, CreateMoveRelationTool, SelectTool, utils
-// } from './modeling/index.js';
-// import {OSLCSchemaConnector, getOSLCSchemaChildren, getOSLCSchemaComponent, getRelations, getRelationComponent, getRdfType, renderHtml} from './oslc-schema-connector.js';
-//
-// let connector = new OSLCSchemaConnector();
-//
-// // set up and listen to url field
-// let urlField = d3.select('#urlField').node();
-// urlField.value = 'https://vservices.offis.de/rtp/bugzilla/v1.0/services/catalog/singleton';
-// urlField.onchange = function() {connector.open(urlField.value);};
-//
-// let svgComponent = new SvgComponent('top').layout(new HBoxLayout().margin(10));
-// let nodeHierarchyComponent = new HierarchyComponent(getOSLCSchemaChildren, getOSLCSchemaComponent);
-// let relationHierarchyComponent = new HierarchyComponent(getRelations, getRelationComponent);
-//
-// function renderModel() {
-//   svgComponent(d3.select('#graph'), [{id: 'ws'}]);
-//   nodeHierarchyComponent(d3.select('#graph svg'));
-//   svgComponent.layout()(d3.select('#graph svg'));
-//   relationHierarchyComponent(d3.select('#graph svg'));
-//
-//   d3.selectAll('.node').call(nodeManipulator);
-// }
-//
-// connector.on(function(eventType) {
-//   if (eventType === 'read-end') {
-//     renderModel();
-//   }
-// });
-//
-// var nodeManipulator = new Manipulator()
-//   .add(new SelectTool()
-//     .on('select', (el, deselectEls) => {
-//       console.log('selection event');
-//     })
-//   );
-//
-// connector.open(urlField.value);

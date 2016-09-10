@@ -11,11 +11,15 @@ module.exports = {
   module: {
     loaders: [
       {
+				test: /\.css$/,
+				loader: "style-loader!css-loader"
+			},
+      {
+        test: /\.js$/,
         loader: 'babel-loader',
         include: [
           path.resolve(__dirname, "app/js")
         ],
-        test: /\.js$/,
         query: {
           presets: 'es2015'
         }
