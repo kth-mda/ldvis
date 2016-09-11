@@ -103,8 +103,7 @@ limit 1000`).then(function(data) {
   let trEnter = tr.enter().append('tr').on('click', rowClickHandler('#type-list', showObjectsOfType));
   trEnter.append('td').text(d => shrinkResultUri(d['?type']));
   trEnter.append('td').text(d => d['?cnt']);
-  trEnter.on('contextmenu', contextMenu(menu));
-
+  trEnter.on('contextmenu', contextMenu(menu)).attr('title', d => d['?type']);
 });
 
 function getPositions(ev) {
@@ -136,6 +135,7 @@ function showObjectsOfType(types) {
       $('#object-list td').draggable({helper: "clone", stop: function( event, ui ) {
         addDiagramObject(d3.select(event.target).datum()['?obj'], event.clientX, event.clientY);
       }});
+      trEnter.on('contextmenu', contextMenu(menu)).attr('title', d => d['?obj']);
     });
   }
 }
@@ -157,8 +157,8 @@ function showObjectDetails(uri) {
       .data(data, d => d['?r']);
     tr.exit().remove();
     let trEnter = tr.enter().append('tr');
-    trEnter.append('td').text(d => shrinkResultUri(d['?r']));
-    trEnter.append('td').text(d => shrinkResultUri(d['?o']));
+    trEnter.append('td').text(d => shrinkResultUri(d['?r'])).attr('title', d => d['?r']);
+    trEnter.append('td').text(d => shrinkResultUri(d['?o'])).attr('title', d => d['?o']);
   });
 }
 
