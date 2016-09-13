@@ -82,27 +82,34 @@ Split(['#type-list', '#object-list', '#object-details'], {
 // init url field
 let urlField = d3.select('#urlField').node();
 urlField.value = initialServerUrl;
+urlField.onchange = function() {
+  initialServerUrl = urlField.value;
+  loadTypeList(initialServerUrl);
+};
 
+loadTypeList(initialServerUrl);
 // handle resource type list
-loadSparqlTsv(initialServerUrl, `select (count(?a) as ?cnt) ?type
-where {graph ?g {
-    ?a <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?type.
-    }
+function loadTypeList(serverUrl) {
+  loadSparqlTsv(serverUrl, `select (count(?a) as ?cnt) ?type
+  where {graph ?g {
+      ?a <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?type.
+      }
+  }
+  group by ?type
+  limit 1000`).then(function(data) {
+    let tableRowEnter = d3.select('#type-list').selectAll('table').data(['table-dummy-data'])
+      .enter().append('table').append('tr');
+      tableRowEnter.append('th').text('Type');
+      tableRowEnter.append('th').text('Objects');
+    let tr = d3.select('#type-list table').selectAll('tr')
+      .data(data);
+    tr.exit().remove();
+    let trEnter = tr.enter().append('tr').on('click', rowClickHandler('#type-list', showObjectsOfType));
+    trEnter.append('td').text(d => shrinkResultUri(d['?type']));
+    trEnter.append('td').text(d => d['?cnt']);
+    trEnter.on('contextmenu', contextMenu(menu)).attr('title', d => d['?type']);
+  });
 }
-group by ?type
-limit 1000`).then(function(data) {
-  let tableRowEnter = d3.select('#type-list').selectAll('table').data(['table-dummy-data'])
-    .enter().append('table').append('tr');
-    tableRowEnter.append('th').text('Type');
-    tableRowEnter.append('th').text('Objects');
-  let tr = d3.select('#type-list table').selectAll('tr')
-    .data(data);
-  tr.exit().remove();
-  let trEnter = tr.enter().append('tr').on('click', rowClickHandler('#type-list', showObjectsOfType));
-  trEnter.append('td').text(d => shrinkResultUri(d['?type']));
-  trEnter.append('td').text(d => d['?cnt']);
-  trEnter.on('contextmenu', contextMenu(menu)).attr('title', d => d['?type']);
-});
 
 function getPositions(ev) {
   let result = {};
@@ -198,7 +205,6 @@ function getRelations() {
       relations.push({id: uuid.v4(), from: triple.subject.toString(), to: triple.object.toString(), text: triple.predicate.toString()})
     }
   });
-  console.log('rels', relations);
   return relations;
 }
 
@@ -247,6 +253,7 @@ function addDiagramObject(uri, x, y) {
 
 function addDiagramRleationObject(subjectUri, relationUri, objectUri, x, y) {
   addTriple(diagramData, peelUri(subjectUri), peelUri(relationUri), peelUri(objectUri));
+  addTriple(diagramData, peelUri(subjectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
   let svgBounds = d3.select('svg').node().getBoundingClientRect();
   addTriple(diagramData, peelUri(objectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
   addTriple(diagramData, peelUri(objectUri), OSLCKTH('posx'), parser.rdf.createLiteral((x - svgBounds.left).toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
