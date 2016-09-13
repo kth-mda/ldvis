@@ -88,6 +88,7 @@ urlField.onchange = function() {
 };
 
 loadTypeList(initialServerUrl);
+
 // handle resource type list
 function loadTypeList(serverUrl) {
   loadSparqlTsv(serverUrl, `select (count(?a) as ?cnt) ?type
@@ -102,21 +103,13 @@ function loadTypeList(serverUrl) {
       tableRowEnter.append('th').text('Type');
       tableRowEnter.append('th').text('Objects');
     let tr = d3.select('#type-list table').selectAll('tr')
-      .data(data);
+      .data(_.orderBy(data, d => shrinkResultUri(d['?type'])));
     tr.exit().remove();
     let trEnter = tr.enter().append('tr').on('click', rowClickHandler('#type-list', showObjectsOfType));
     trEnter.append('td').text(d => shrinkResultUri(d['?type']));
     trEnter.append('td').text(d => d['?cnt']);
     trEnter.on('contextmenu', contextMenu(menu)).attr('title', d => d['?type']);
   });
-}
-
-function getPositions(ev) {
-  let result = {};
-  for (let prefix of ['client', 'offset', 'page', 'screen']) {
-    result[prefix] = [ev[prefix + 'X'], ev[prefix + 'Y']];
-  }
-  return result;
 }
 
 // handle object list
@@ -133,7 +126,7 @@ function showObjectsOfType(types) {
         .enter().append('table').append('tr');
         tableRowEnter.append('th').text('URI');
       let tr = d3.select('#object-list table').selectAll('tr')
-        .data(data, d => d['?obj']);
+        .data(_.orderBy(data, d => shrinkResultUri(d['?obj'])), d => d['?obj']);
       tr.exit().remove();
       let trEnter = tr.enter().append('tr').on('click', rowClickHandler('#object-list', uri => showObjectDetails(uri[0]['?obj'])));
       trEnter.append('td').text(d => shrinkResultUri(d['?obj']));
@@ -159,7 +152,7 @@ function showObjectDetails(uri) {
       tableRowEnter.append('th').text('Property');
       tableRowEnter.append('th').text('Value');
     let tr = d3.select('#object-details table').selectAll('tr')
-      .data(data, d => d['?r']);
+      .data(_.orderBy(data, [d => shrinkResultUri(d['?r']), d => shrinkResultUri(d['?o'])]), d => d['?r']);
     tr.exit().remove();
     let trEnter = tr.enter().append('tr');
     trEnter.append('td').text(d => shrinkResultUri(d['?r'])).attr('title', d => d['?r']);
