@@ -1,4 +1,4 @@
-import * as d3 from './modeling/d3';
+import {d3} from '../../../../../fomod-develop';
 import _ from 'lodash';
 import Promise from 'promise';
 import RdfXmlParser from 'rdf-parser-rdfxml';
@@ -90,6 +90,20 @@ export function addTriple(graph, subject, predicate, object) {
   }
 }
 
+// adds triple to graph
+// if subject and predicate is found, all triples are removed first
+// subject, predicate and object must all be truthy
+export function setTripleObject(graph, subject, predicate, object) {
+  console.log('setTripleObject', graph, subject, predicate, object);
+  if (subject && predicate && object) {
+    console.log('before', graphToString(graph));
+    graph.removeMatches(subject, predicate, null);
+    let triple = parser.rdf.createTriple(makeNameNodeIfString(subject), makeNameNodeIfString(predicate), makeNameNodeIfString(object));
+    graph.add(triple);
+    console.log('after', graphToString(graph));
+  }
+}
+
 // returns the first object having the specified subject and predicate, or null if not found
 export function getOneObject(graph, subject, predicate) {
   let triples = graph.match(subject, predicate, null);
@@ -102,6 +116,15 @@ export function getOneObject(graph, subject, predicate) {
 
 // returns the first object having the specified subject and predicate as a string, or null if not found
 export function getOneObjectString(graph, subject, predicate) {
+  let triples = graph.match(subject, predicate, null);
+  if (triples.length) {
+    return triples.toArray()[0].object.toString();
+  } else {
+    return '';
+  }
+}
+
+export function setOneObject(subject, predicate, value) {
   let triples = graph.match(subject, predicate, null);
   if (triples.length) {
     return triples.toArray()[0].object.toString();

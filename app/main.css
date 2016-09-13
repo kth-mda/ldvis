@@ -18,6 +18,12 @@ input {
   stroke: none;
 }
 
+.relation text {
+  fill: black;
+  stroke: none;
+  font-size: 9pt;
+}
+
 .node.selected > rect {
   stroke-width: 3px;
   stroke: black;
