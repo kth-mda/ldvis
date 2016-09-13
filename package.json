@@ -23,6 +23,7 @@
     "webpack-dev-middleware": "^1.6.1"
   },
   "dependencies": {
+    "body-parser": "^1.15.2",
     "d3-context-menu": "^0.1.2",
     "jquery": "^2.2.4",
     "jquery-ui": "^1.12.0",

@@ -94,13 +94,10 @@ export function addTriple(graph, subject, predicate, object) {
 // if subject and predicate is found, all triples are removed first
 // subject, predicate and object must all be truthy
 export function setTripleObject(graph, subject, predicate, object) {
-  console.log('setTripleObject', graph, subject, predicate, object);
   if (subject && predicate && object) {
-    console.log('before', graphToString(graph));
     graph.removeMatches(subject, predicate, null);
     let triple = parser.rdf.createTriple(makeNameNodeIfString(subject), makeNameNodeIfString(predicate), makeNameNodeIfString(object));
     graph.add(triple);
-    console.log('after', graphToString(graph));
   }
 }
 

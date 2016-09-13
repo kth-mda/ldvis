@@ -1,0 +1,15 @@
+{
+  "owl": "http://www.w3.org/2002/07/owl#",
+  "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+  "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+  "rdfa": "http://www.w3.org/ns/rdfa#",
+  "xhv": "http://www.w3.org/1999/xhtml/vocab#",
+  "xml": "http://www.w3.org/XML/1998/namespace",
+  "xsd": "http://www.w3.org/2001/XMLSchema#",
+  "oslc_rm": "http://open-services.net/ns/rm#",
+  "simulink": "http://mathworks.com/simulink/rdf#",
+  "oslc_cm": "http://open-services.net/ns/cm#",
+  "simulink_services": "https://vservices.offis.de/rtp/simulink/v1.0/services",
+  "foaf": "http://xmlns.com/foaf/0.1/",
+  "oslc_am": "http://open-services.net/ns/am#"
+}

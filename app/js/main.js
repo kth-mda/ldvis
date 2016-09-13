@@ -20,14 +20,39 @@ import uuid from 'node-uuid';
 let initialServerUrl = 'http://localhost:8080/openrdf-sesame/repositories/scania';
 
 var parser = new RdfXmlParser();
-parser.rdf.prefixes['rdf'] = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
-parser.rdf.prefixes['oslc_rm'] = 'http://open-services.net/ns/rm#';
-parser.rdf.prefixes['simulink'] = 'http://mathworks.com/simulink/rdf#';
-parser.rdf.prefixes['oslc_cm'] = 'http://open-services.net/ns/cm#';
-parser.rdf.prefixes['simulink_services'] = 'https://vservices.offis.de/rtp/simulink/v1.0/services';
-parser.rdf.prefixes['foaf'] = 'http://xmlns.com/foaf/0.1/';
-parser.rdf.prefixes['oslc_am'] = 'http://open-services.net/ns/am#';
-//parser.rdf.prefixes['xxx'] = 'xxx';
+loadPrefixes();
+// parser.rdf.prefixes['rdf'] = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+// parser.rdf.prefixes['oslc_rm'] = 'http://open-services.net/ns/rm#';
+// parser.rdf.prefixes['simulink'] = 'http://mathworks.com/simulink/rdf#';
+// parser.rdf.prefixes['oslc_cm'] = 'http://open-services.net/ns/cm#';
+// parser.rdf.prefixes['simulink_services'] = 'https://vservices.offis.de/rtp/simulink/v1.0/services';
+// parser.rdf.prefixes['foaf'] = 'http://xmlns.com/foaf/0.1/';
+// parser.rdf.prefixes['oslc_am'] = 'http://open-services.net/ns/am#';
+
+function loadPrefixes() {
+  d3.json('/prefixes', function(json) {
+      for (let key in json) {
+        parser.rdf.prefixes[key] = json[key];
+      }
+  })
+}
+
+function savePrefixes() {
+  let prefixes = {};
+  Object.keys(parser.rdf.prefixes).forEach(function(key) {
+    prefixes[key] = parser.rdf.prefixes[key];
+  });
+
+  var xhr = new XMLHttpRequest();
+  xhr.onload = function () {
+    if (onReady != undefined) {
+      console.log(this.responseText);
+    }
+  };
+  xhr.open("post", "prefixes", true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.send(JSON.stringify(prefixes));
+}
 
 let contextMenu = d3ctx(d3);
 

@@ -5,12 +5,31 @@ var config = require("./webpack.config.js");
 var path = require('path');
 var http = require('request');
 var fs = require('fs');
+var bodyParser = require('body-parser')
 
 var port = 3012;
 var useCache = false;
 
 var app = express();
 app.use(webpackDevMiddleware(webpack(config), {}));
+
+app.use(bodyParser.json());
+
+// respond with prefixes json
+app.get('/prefixes', function(request, response) {
+  try {
+    var prefixesText = fs.readFileSync('prefixes.json');
+    var prefixes = JSON.parse(prefixesText);
+    response.send(prefixesText);
+  } catch (e) {
+    response.send(500, 'no valid prefixes found');
+  }
+});
+
+// save all prefixes
+app.post('/prefixes', function(request, response) {
+  fs.writeFileSync('prefixes.json', JSON.stringify(request.body, null, '  '));
+});
 
 app.get('/proxy', function (request, response) {
   console.log('get /proxy');
