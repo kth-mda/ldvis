@@ -40,11 +40,15 @@ svg.selected > rect {
 }
 
 .list {
+  flex: 1;
+  display: flex;
   overflow: auto;
   background-color: #eee;
 }
 
 table {
+  width: 100%;
+  flex: 1;
   background-color: #ddd;
 }
 
@@ -70,15 +74,24 @@ table tr.selected td {
 #leftcol {
   display: flex;
   flex-direction: column;
-  min-width: 3em;
 }
 
 #type-list td:nth-child(2) {
   text-align: right;
 }
 
+#type-list td:nth-child(1) {
+  width: 100%;
+}
+
+#object-list td {
+  width: 100%;
+}
+
 #rightcol {
-  min-width: 10em;
+  flex; 1;
+  display: flex;
+  min-width: 1em;
 }
 
 .gutter {
