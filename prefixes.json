@@ -11,5 +11,9 @@
   "oslc_cm": "http://open-services.net/ns/cm#",
   "simulink_services": "https://vservices.offis.de/rtp/simulink/v1.0/services",
   "foaf": "http://xmlns.com/foaf/0.1/",
-  "oslc_am": "http://open-services.net/ns/am#"
+  "oslc_am": "http://open-services.net/ns/am#",
+  "scania": "http://scania.com/sw/ns#",
+  "ldp": "http://www.w3.org/ns/ldp#",
+  "sioc": "http://rdfs.org/sioc/ns#",
+  "sesamm2": "http://www.scania.com/ns/SesammTool2#"
 }

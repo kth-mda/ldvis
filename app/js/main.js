@@ -1,6 +1,7 @@
 require('jquery-ui/themes/base/core.css');
 require('jquery-ui/themes/base/menu.css');
-// require('jquery-ui/themes/base/theme.css');
+// require('jquery-ui/themes/base/dialog.css');
+require('jquery-ui/themes/base/theme.css');
 import $ from 'jquery';
 let draggable = require('jquery-ui/ui/widgets/draggable');
 draggable();
@@ -15,63 +16,26 @@ import {
 import {setTripleObject, fetchGraph, matchForEachTriple, getOneObject, getOneObjectString, addTriple, renderHtmlPropsTable, getPropsProps, tripleToString, graphToString} from './oslc-schema-utils';
 import d3ctx from 'd3-context-menu';
 import uuid from 'node-uuid';
+import {loadPrefixes, savePrefixes, initPrefixDialog, openAddPrefixDialog} from './prefix-manager';
 
 // let initialServerUrl = 'https://vservices.offis.de/rtp/fuseki/v1.0/ldr/query';
 let initialServerUrl = 'http://localhost:8080/openrdf-sesame/repositories/scania';
 
 var parser = new RdfXmlParser();
-loadPrefixes();
-// parser.rdf.prefixes['rdf'] = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
-// parser.rdf.prefixes['oslc_rm'] = 'http://open-services.net/ns/rm#';
-// parser.rdf.prefixes['simulink'] = 'http://mathworks.com/simulink/rdf#';
-// parser.rdf.prefixes['oslc_cm'] = 'http://open-services.net/ns/cm#';
-// parser.rdf.prefixes['simulink_services'] = 'https://vservices.offis.de/rtp/simulink/v1.0/services';
-// parser.rdf.prefixes['foaf'] = 'http://xmlns.com/foaf/0.1/';
-// parser.rdf.prefixes['oslc_am'] = 'http://open-services.net/ns/am#';
-
-function loadPrefixes() {
-  d3.json('/prefixes', function(json) {
-      for (let key in json) {
-        parser.rdf.prefixes[key] = json[key];
-      }
-  })
-}
-
-function savePrefixes() {
-  let prefixes = {};
-  Object.keys(parser.rdf.prefixes).forEach(function(key) {
-    prefixes[key] = parser.rdf.prefixes[key];
-  });
-
-  var xhr = new XMLHttpRequest();
-  xhr.onload = function () {
-    if (onReady != undefined) {
-      console.log(this.responseText);
-    }
-  };
-  xhr.open("post", "prefixes", true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.send(JSON.stringify(prefixes));
-}
+loadPrefixes(parser.rdf.prefixes, 'prefixes');
+initPrefixDialog(parser.rdf.prefixes, function() {
+  savePrefixes(parser.rdf.prefixes, 'prefixes');
+});
 
 let contextMenu = d3ctx(d3);
 
 let menu = [
-    {
-        title: 'Item #1',
-        action: function(elm, d, i) {
-            console.log('Item #1 clicked!');
-            console.log('The data for this circle is: ' + d);
-        },
-        disabled: false // optional, defaults to false
-    },
-    {
-        title: 'Item #2',
-        action: function(elm, d, i) {
-            console.log('You have clicked the second item!');
-            console.log('The data for this circle is: ' + d);
-        }
+  {
+    title: 'Add prefix definition',
+    action: function(elm, d, i) {
+      openAddPrefixDialog(d['?type']);
     }
+  }
 ];
 
 // returns uri shrinked by using prefix form for defined prefixes

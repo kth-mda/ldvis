@@ -15,6 +15,11 @@ module.exports = {
 				loader: "style-loader!css-loader"
 			},
       {
+          test: /\.png$/,
+          loader: "url-loader",
+          query: { mimetype: "image/png" }
+      },
+      {
         test: /\.js$/,
         loader: 'babel-loader',
         include: [
