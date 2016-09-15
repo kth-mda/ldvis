@@ -26,11 +26,14 @@ app.get('/prefixes', function(request, response) {
   }
 });
 
-// save all prefixes
+// save posted prefixes json object
 app.post('/prefixes', function(request, response) {
   fs.writeFileSync('prefixes.json', JSON.stringify(request.body, null, '  '));
 });
 
+// /proxy?url=<URL> makes a request to URL and forwards headers authorization
+// and accept outgoing, and all headers incoming, which makes the proxy support
+// basic authentication between browser and remote service.
 app.get('/proxy', function (request, response) {
   console.log('get /proxy');
   response.header('Access-Control-Allow-Origin', '*');

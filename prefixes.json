@@ -15,5 +15,11 @@
   "scania": "http://scania.com/sw/ns#",
   "ldp": "http://www.w3.org/ns/ldp#",
   "sioc": "http://rdfs.org/sioc/ns#",
-  "sesamm2": "http://www.scania.com/ns/SesammTool2#"
+  "sesamm2": "http://www.scania.com/ns/SesammTool2#",
+  "virt_rdf": "http://www.openlinksw.com/schemas/virtrdf#",
+  "virt_acl": "http://www.openlinksw.com/ontology/acl#",
+  "sioc_services": "http://rdfs.org/sioc/services#",
+  "virt_schemas": "http://www.openlinksw.com/schemas",
+  "w3": "http://www.w3.org/ns/",
+  "virt_restrictions": "http://www.openlinksw.com/ontology/restrictions#"
 }

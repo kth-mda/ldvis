@@ -29,14 +29,16 @@ initPrefixDialog(parser.rdf.prefixes, function() {
 
 let contextMenu = d3ctx(d3);
 
-let menu = [
-  {
-    title: 'Add prefix definition',
-    action: function(elm, d, i) {
-      openAddPrefixDialog(d['?type']);
+function addPrefixDefinitionMenu(d2uri) {
+  return [
+    {
+      title: 'Add prefix definition',
+      action: function(elm, d, i) {
+        openAddPrefixDialog(d2uri(d));
+      }
     }
-  }
-];
+  ]
+}
 
 // returns uri shrinked by using prefix form for defined prefixes
 // if uri has the form <xxxyyy> then the prefixed form is prefix:yyy
@@ -97,7 +99,7 @@ function loadTypeList(serverUrl) {
     let trEnter = tr.enter().append('tr').on('click', rowClickHandler('#type-list', showObjectsOfType));
     trEnter.append('td').text(d => shrinkResultUri(d['?type']));
     trEnter.append('td').text(d => d['?cnt']);
-    trEnter.on('contextmenu', contextMenu(menu)).attr('title', d => d['?type']);
+    trEnter.on('contextmenu', contextMenu(addPrefixDefinitionMenu(d => d['?type']))).attr('title', d => d['?type']);
   });
 }
 
@@ -122,7 +124,8 @@ function showObjectsOfType(types) {
       $('#object-list td').draggable({helper: "clone", stop: function( event, ui ) {
         addDiagramObject(d3.select(event.target).datum()['?obj'], event.clientX, event.clientY);
       }});
-      trEnter.on('contextmenu', contextMenu(menu)).attr('title', d => d['?obj']);
+      trEnter.on('contextmenu', contextMenu(addPrefixDefinitionMenu(d => d['?obj'])))
+        .attr('title', d => d['?obj']);
     });
   }
 }
@@ -214,7 +217,6 @@ function renderAll() {
   });
 
   d3.selectAll('#rightcol .obj')
-    .on('contextmenu', contextMenu(menu))
     .call(manipulator);
 }
 renderAll();
