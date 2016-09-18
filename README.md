@@ -1,36 +1,29 @@
-# oslc-schema-viewer
-Extracts schema information from an OSLC provider and draws a Domain Specification View
+# LDVis - Linked Data Visualizer
 
-## Overview
-Starting with an OSLC catalog URL, this web application
-- loads the catalog resource and uses it to find all resource types, domains and resource shapes
-- draws a diagram of all domains, resource types and properties.
+A web app that visualizes objects and relations in a triple store based on a mapping specification.
 
-![Domain Specification View example](docs/domainSpecificationView.png)
+The user specifies
 
+- a mapping specification
+- a triple store server URL
 
-## OSLC Meta model
+The mapping specification tells
 
-Parts relevant for this application.
+- which object types to display as grahical nodes of a certain shape
+- which relations to display as lines between the nodes
+- which relations to display as nodes nested inside each others
+- which relations to display as text labels inside the nodes
 
-![meta model](http://yuml.me/4acb73c3)
+The app then uses the mapping specification to navigate the triple store and display the nodes and lines.
 
-## Metadata Retrieval Algorithm
-
-- get the catalog
-    - for each service provider
-        - for each service
-            - for each QueryCapability and CreationFactory
-                - get the resourceShape - save it
-                    - for each property in it
-                        - find out resource type by type of any found resource
-                        - find out reference property target type by oslc:range
+The initial use case will work with a triple store using Sparql queries according to the SPARQL 1.1 Graph Store HTTP Protocol (see https://www.w3.org/TR/sparql11-http-rdf-update/).
+The app may be extended to work for OSLC compliant servers.
 
 ## Set up development environment
 
 ### Prerequisites
 
-- access to https://github.com:FindOut/oslc-schema-viewer
+- access to https://github.com:FindOut/ldvis.git
 - node installed - see https://nodejs.org
 - git command line (optional)
 - google chrome browser - Firefox and IE11+ will be supported later
@@ -38,12 +31,11 @@ Parts relevant for this application.
 ### Checkout, build and run
 
 ```
-git clone git@github.com:FindOut/oslc-schema-viewer.git
-cd oslc-schema-viewer
+git clone git@github.com:FindOut/ldvis.git
+cd ldvis
 npm install
 npm start
 ```
-The last command starts a proxy server and opens a web browser that after some seconds will show the Domain Specification View for the offis bugzilla OSLC catalog.
+The last command starts a proxy server and opens a web browser that after some seconds will show the user interface.
 
 If you dont have the git command line installed, you may download the code as a zip from the github web ui.
-# ldvis

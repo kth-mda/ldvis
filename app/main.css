@@ -105,6 +105,10 @@ table tr.selected td {
   flex-direction: column;
 }
 
+#leftcol textarea {
+  flex: 1;
+}
+
 #type-list td:nth-child(2) {
   text-align: right;
 }

@@ -1,13 +1,13 @@
 {
-  "name": "ldexplorer",
+  "name": "ldvis",
   "version": "1.0.0",
-  "description": "explore linked data and buid illustrative graph",
+  "description": "visualize linked data from a graph store using a mapping specification",
   "main": "getdata.js",
   "scripts": {
-    "start": "opener http://localhost:3012 && node server.js",
-    "dev": "opener http://localhost:3012 && nodemon --watch server.js server.js"
+    "start": "opener http://localhost:3015 && node server.js",
+    "dev": "opener http://localhost:3015 && nodemon --watch server.js server.js"
   },
-  "repository": "git@github.com:FindOut/ldexplorer.git",
+  "repository": "git@github.com:FindOut/ldvis.git",
   "author": "dag.rende@find-out.se",
   "devDependencies": {
     "babel-core": "^6.7.7",
@@ -27,6 +27,7 @@
   "dependencies": {
     "body-parser": "^1.15.2",
     "d3-context-menu": "^0.1.2",
+    "fomod": "findout/fomod#develop",
     "jquery": "^2.2.4",
     "jquery-ui": "^1.12.0",
     "lodash": "^4.11.1",

@@ -18,6 +18,8 @@ import d3ctx from 'd3-context-menu';
 import uuid from 'node-uuid';
 import {loadPrefixes, savePrefixes, initPrefixDialog, openAddPrefixDialog} from './prefix-manager';
 
+console.log(SvgComponent);
+
 // let initialServerUrl = 'https://vservices.offis.de/rtp/fuseki/v1.0/ldr/query';
 let initialServerUrl = 'http://localhost:8080/openrdf-sesame/repositories/scania';
 
@@ -63,12 +65,6 @@ Split(['#leftcol', '#rightcol'], {
     snapOffset: 1
 });
 
-Split(['#type-list', '#object-list', '#object-details'], {
-    direction: 'vertical',
-    gutterSize: 5,
-    minSize: 50,
-    snapOffset: 1
-});
 
 // init url field
 let urlField = d3.select('#urlField').node();
@@ -77,83 +73,6 @@ urlField.onchange = function() {
   initialServerUrl = urlField.value;
   loadTypeList(initialServerUrl);
 };
-
-loadTypeList(initialServerUrl);
-
-// handle resource type list
-function loadTypeList(serverUrl) {
-  loadSparqlTsv(serverUrl, `select (count(?a) as ?cnt) ?type
-  where {graph ?g {
-      ?a <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?type.
-      }
-  }
-  group by ?type
-  limit 1000`).then(function(data) {
-    let tableRowEnter = d3.select('#type-list').selectAll('table').data(['table-dummy-data'])
-      .enter().append('table').append('tr');
-      tableRowEnter.append('th').text('Type');
-      tableRowEnter.append('th').text('Objects');
-    let tr = d3.select('#type-list table').selectAll('tr')
-      .data(_.orderBy(data, d => shrinkResultUri(d['?type'])));
-    tr.exit().remove();
-    let trEnter = tr.enter().append('tr').on('click', rowClickHandler('#type-list', showObjectsOfType));
-    trEnter.append('td').text(d => shrinkResultUri(d['?type']));
-    trEnter.append('td').text(d => d['?cnt']);
-    trEnter.on('contextmenu', contextMenu(addPrefixDefinitionMenu(d => d['?type']))).attr('title', d => d['?type']);
-  });
-}
-
-// handle object list
-function showObjectsOfType(types) {
-  if (types.length === 1) {
-    let query = `select ?obj
-    where {graph ?g {
-        ?obj <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ${types[0]['?type']}.
-        }
-    }
-    limit 1000`;
-    loadSparqlTsv(initialServerUrl, query).then(function(data) {
-      let tableRowEnter = d3.select('#object-list').selectAll('table').data(['table-dummy-data'])
-        .enter().append('table').append('tr');
-        tableRowEnter.append('th').text('URI');
-      let tr = d3.select('#object-list table').selectAll('tr')
-        .data(_.orderBy(data, d => shrinkResultUri(d['?obj'])), d => d['?obj']);
-      tr.exit().remove();
-      let trEnter = tr.enter().append('tr').on('click', rowClickHandler('#object-list', uri => showObjectDetails(uri[0]['?obj'])));
-      trEnter.append('td').text(d => shrinkResultUri(d['?obj']));
-      $('#object-list td').draggable({helper: "clone", stop: function( event, ui ) {
-        addDiagramObject(d3.select(event.target).datum()['?obj'], event.clientX, event.clientY);
-      }});
-      trEnter.on('contextmenu', contextMenu(addPrefixDefinitionMenu(d => d['?obj'])))
-        .attr('title', d => d['?obj']);
-    });
-  }
-}
-
-// handle object details
-function showObjectDetails(uri) {
-  let query = `select ?r ?o
-  where {graph ?g {
-      ${uri} ?r ?o.
-      }
-  }
-  limit 1000`;
-  loadSparqlTsv(initialServerUrl, query).then(function(data) {
-    let tableRowEnter = d3.select('#object-details').selectAll('table').data(['table-dummy-data'])
-      .enter().append('table').append('tr');
-      tableRowEnter.append('th').text('Property');
-      tableRowEnter.append('th').text('Value');
-    let tr = d3.select('#object-details table').selectAll('tr')
-      .data(_.orderBy(data, [d => shrinkResultUri(d['?r']), d => shrinkResultUri(d['?o'])]), d => d['?r']);
-    tr.exit().remove();
-    let trEnter = tr.enter().append('tr');
-    trEnter.append('td').text(d => shrinkResultUri(d['?r'])).attr('title', d => d['?r']);
-    trEnter.append('td').text(d => shrinkResultUri(d['?o'])).attr('title', d => d['?o']);
-    $('#object-details td').draggable({helper: "clone", stop: function( event, ui ) {
-      addDiagramRleationObject(uri, d3.select(event.target).datum()['?r'], d3.select(event.target).datum()['?o'], event.clientX, event.clientY);
-    }});
-  });
-}
 
 // handle diagram
 let OSLCKTH = suffix => 'http://oslc.kth.se/ldexplorer#' + suffix;
