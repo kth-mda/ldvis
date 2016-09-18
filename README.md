@@ -46,3 +46,4 @@ npm start
 The last command starts a proxy server and opens a web browser that after some seconds will show the Domain Specification View for the offis bugzilla OSLC catalog.
 
 If you dont have the git command line installed, you may download the code as a zip from the github web ui.
+# ldvis
