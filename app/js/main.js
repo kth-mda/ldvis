@@ -45,6 +45,7 @@ import {
   openAddPrefixDialog
 } from './prefix-manager';
 import debounce from 'debounce';
+import {compileCode} from './compilecode';
 
 // let initialServerUrl = 'https://vservices.offis.de/rtp/fuseki/v1.0/ldr/query';
 let initialServerUrl = 'http://localhost:8080/openrdf-sesame/repositories/scania';
@@ -120,16 +121,25 @@ function runSpec(spec) {
   let pattern = /([\s\S]*)mapto([\s\S]*)end[\s\S]*/m;
   let match = pattern.exec(spec);
   if (match) {
+    diagramData = parser.rdf.createGraph();
     let sparql = match[1];
     let mapTo = match[2];
     loadSparqlTsv(urlField.value, sparql).then(function (data) {
       // console.log(JSON.stringify(data, null, '  '));
-      console.log('data', data);
-      _.forEach(data, function(obj, i) {
-        console.log(obj['?o'], i);
-        addDiagramObject(obj['?o'], 10, 10 + i * 40);
-        renderAll();
-      })
+      if (data && data.length > 0) {
+        // replace ?x in mapTo with real variables
+        _.forEach(Object.keys(data[0]), function(key) {
+          mapTo = mapTo.replace(key, "obj['" + key + "']");
+        });
+
+        // compile and run
+        let mapToCompiled = compileCode(mapTo);
+        _.forEach(data, function(obj, i) {
+          console.log(obj['?o'], i);
+          mapToCompiled({node: addDiagramObject, obj: obj, i: i});
+        })
+      }
+      renderAll();
     });
   }
 }
