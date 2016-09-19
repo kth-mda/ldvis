@@ -1,0 +1,5 @@
+[
+  {
+    "text": "select distinct ?o\nwhere {graph ?g {\n  ?s a ?o.\n}}\nmapto\n  mappingexpression\nend\n"
+  }
+]

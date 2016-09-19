@@ -10,37 +10,48 @@ import Split from 'split.js';
 import RdfXmlParser from 'rdf-parser-rdfxml';
 import _ from 'lodash';
 import {
-  d3, SvgComponent, SimpleTextBoxComponent, RelationComponent, HierarchyComponent, HBoxLayout, VBoxLayout, XyLayout, Manipulator,
-  MoveNodeTool, CreateMoveRelationTool, SelectTool, utils
+  d3,
+  SvgComponent,
+  SimpleTextBoxComponent,
+  RelationComponent,
+  HierarchyComponent,
+  HBoxLayout,
+  VBoxLayout,
+  XyLayout,
+  Manipulator,
+  MoveNodeTool,
+  CreateMoveRelationTool,
+  SelectTool,
+  utils
 } from '../../../../../fomod-develop';
-import {setTripleObject, fetchGraph, matchForEachTriple, getOneObject, getOneObjectString, addTriple, renderHtmlPropsTable, getPropsProps, tripleToString, graphToString} from './oslc-schema-utils';
+import {
+  setTripleObject,
+  fetchGraph,
+  matchForEachTriple,
+  getOneObject,
+  getOneObjectString,
+  addTriple,
+  renderHtmlPropsTable,
+  getPropsProps,
+  tripleToString,
+  graphToString
+} from './oslc-schema-utils';
 import d3ctx from 'd3-context-menu';
 import uuid from 'node-uuid';
-import {loadPrefixes, savePrefixes, initPrefixDialog, openAddPrefixDialog} from './prefix-manager';
-
-console.log(SvgComponent);
+import {
+  loadPrefixes,
+  savePrefixes,
+  initPrefixDialog,
+  openAddPrefixDialog
+} from './prefix-manager';
+import debounce from 'debounce';
 
 // let initialServerUrl = 'https://vservices.offis.de/rtp/fuseki/v1.0/ldr/query';
 let initialServerUrl = 'http://localhost:8080/openrdf-sesame/repositories/scania';
 
 var parser = new RdfXmlParser();
-loadPrefixes(parser.rdf.prefixes, 'prefixes');
-initPrefixDialog(parser.rdf.prefixes, function() {
-  savePrefixes(parser.rdf.prefixes, 'prefixes');
-});
 
 let contextMenu = d3ctx(d3);
-
-function addPrefixDefinitionMenu(d2uri) {
-  return [
-    {
-      title: 'Add prefix definition',
-      action: function(elm, d, i) {
-        openAddPrefixDialog(d2uri(d));
-      }
-    }
-  ]
-}
 
 // returns uri shrinked by using prefix form for defined prefixes
 // if uri has the form <xxxyyy> then the prefixed form is prefix:yyy
@@ -59,20 +70,69 @@ $(window).resize(adjustUISize);
 adjustUISize();
 
 Split(['#leftcol', '#rightcol'], {
-    sizes: [50, 50],
-    minSize: 200,
-    gutterSize: 5,
-    snapOffset: 1
+  sizes: [50, 50],
+  minSize: 200,
+  gutterSize: 5,
+  snapOffset: 1
 });
 
 
 // init url field
 let urlField = d3.select('#urlField').node();
 urlField.value = initialServerUrl;
-urlField.onchange = function() {
+urlField.onchange = function () {
   initialServerUrl = urlField.value;
-  loadTypeList(initialServerUrl);
+  console.log('changed url to', initialServerUrl);
 };
+
+// init mapping spec field
+let mappingspec = d3.select('#mappingspec');
+d3.json('/mappingspecs', function (data) {
+  mappingspec.property('value', data[0].text);
+});
+mappingspec.on('keyup', function () {
+  if (d3.event.ctrlKey && d3.event.key === 'r') {
+    runSpec(mappingspec.property('value'));
+  } else {
+    debouncedSpecChanged();
+  }
+});
+
+let debouncedSpecChanged = debounce(specChanged, 1000);
+
+function specChanged() {
+  console.log('saving mappingspec');
+  var xhr = new XMLHttpRequest();
+  xhr.onload = function () {
+    if (xhr.onReady != undefined) {
+      console.log(this.responseText);
+    }
+  };
+  xhr.open("post", 'mappingspecs', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.send(JSON.stringify([{
+    text: mappingspec.property('value')
+  }]));
+}
+
+// execute sparql query and map to diagram objects
+function runSpec(spec) {
+  let pattern = /([\s\S]*)mapto([\s\S]*)end[\s\S]*/m;
+  let match = pattern.exec(spec);
+  if (match) {
+    let sparql = match[1];
+    let mapTo = match[2];
+    loadSparqlTsv(urlField.value, sparql).then(function (data) {
+      // console.log(JSON.stringify(data, null, '  '));
+      console.log('data', data);
+      _.forEach(data, function(obj, i) {
+        console.log(obj['?o'], i);
+        addDiagramObject(obj['?o'], 10, 10 + i * 40);
+        renderAll();
+      })
+    });
+  }
+}
 
 // handle diagram
 let OSLCKTH = suffix => 'http://oslc.kth.se/ldexplorer#' + suffix;
@@ -84,7 +144,7 @@ let svgComponent = new SvgComponent('top').layout(new XyLayout()
   .dataY(d => +getOneObjectString(diagramData, d, OSLCKTH('posy'))));
 let nodeComponent = new SimpleTextBoxComponent('obj', d => [shrinkResultUri(d)])
   .dataId(d => d);
-let relationComponent = new RelationComponent('relation', d=>[shrinkResultUri(d.text)]);
+let relationComponent = new RelationComponent('relation', d => [shrinkResultUri(d.text)]);
 
 function getChildren(parent, data) {
   if (parent) {
@@ -102,11 +162,16 @@ function getComponent(dataItem) {
 function getRelations() {
   let relations = [];
   let visibleObjects = diagramData.filter(t => t.predicate.toString() === OSLCKTH('visible'));
-  diagramData.toArray().forEach(function(triple) {
-    if (visibleObjects.some(t => t.subject.toString() === triple.subject.toString())
-        && visibleObjects.some(t => t.subject.toString() === triple.object.toString())) {
+  diagramData.toArray().forEach(function (triple) {
+    if (visibleObjects.some(t => t.subject.toString() === triple.subject.toString()) &&
+      visibleObjects.some(t => t.subject.toString() === triple.object.toString())) {
       // both subject and object of this relation is visible in diagram
-      relations.push({id: uuid.v4(), from: triple.subject.toString(), to: triple.object.toString(), text: triple.predicate.toString()})
+      relations.push({
+        id: uuid.v4(),
+        from: triple.subject.toString(),
+        to: triple.object.toString(),
+        text: triple.predicate.toString()
+      })
     }
   });
   return relations;
@@ -115,15 +180,15 @@ function getRelations() {
 let hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
 
 let manipulator = new Manipulator()
-.add(new MoveNodeTool()
-  .on('end', (sourceEls, targetEl, targetRelPosList) => {
-      sourceEls.each(function(d, i) {
+  .add(new MoveNodeTool()
+    .on('end', (sourceEls, targetEl, targetRelPosList) => {
+      sourceEls.each(function (d, i) {
         setTripleObject(diagramData, d, OSLCKTH('posx'), parser.rdf.createLiteral(targetRelPosList[i].x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
         setTripleObject(diagramData, d, OSLCKTH('posy'), parser.rdf.createLiteral(targetRelPosList[i].y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
       });
       renderAll();
-  }))
-.add(new SelectTool());
+    }))
+  .add(new SelectTool());
 
 function renderAll() {
   let svg = svgComponent(d3.select('#rightcol'));
@@ -131,8 +196,8 @@ function renderAll() {
   svgComponent.layout()(d3.select('#rightcol svg'));
   let rels = getRelations();
   let relsEls = relationComponent(svg, rels);
-  relsEls.each(function(d) {
-      this.fomod.layout(d3.select(this));
+  relsEls.each(function (d) {
+    this.fomod.layout(d3.select(this));
   });
 
   d3.selectAll('#rightcol .obj')
@@ -148,21 +213,17 @@ function peelUri(uri) {
 function addDiagramObject(uri, x, y) {
   let svgBounds = d3.select('svg').node().getBoundingClientRect();
   addTriple(diagramData, peelUri(uri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-  addTriple(diagramData, peelUri(uri), OSLCKTH('posx'), parser.rdf.createLiteral((x - svgBounds.left).toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-  addTriple(diagramData, peelUri(uri), OSLCKTH('posy'), parser.rdf.createLiteral((y - svgBounds.top).toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-
-  renderAll();
+  addTriple(diagramData, peelUri(uri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+  addTriple(diagramData, peelUri(uri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
 }
 
-function addDiagramRleationObject(subjectUri, relationUri, objectUri, x, y) {
+function addDiagramRelationObject(subjectUri, relationUri, objectUri, x, y) {
   addTriple(diagramData, peelUri(subjectUri), peelUri(relationUri), peelUri(objectUri));
   addTriple(diagramData, peelUri(subjectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
   let svgBounds = d3.select('svg').node().getBoundingClientRect();
   addTriple(diagramData, peelUri(objectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-  addTriple(diagramData, peelUri(objectUri), OSLCKTH('posx'), parser.rdf.createLiteral((x - svgBounds.left).toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-  addTriple(diagramData, peelUri(objectUri), OSLCKTH('posy'), parser.rdf.createLiteral((y - svgBounds.top).toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-
-  renderAll();
+  addTriple(diagramData, peelUri(objectUri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+  addTriple(diagramData, peelUri(objectUri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
 }
 
 
@@ -178,40 +239,20 @@ function getSelected(parentElement) {
   return parentElement.selectAll('.selected').data();
 }
 
-// click handler maker for selectting clicked elements
-// usage: to make tr elements in #atable selectable, do
-// d3.select(#atable).selectAll('tr').on('click', rowClickHandler('#atable', selectionChanged))
-// and use css that makes tr.selected look selected
-// now you can click table rows to select them, and shift/ctrl/cmd-click them to toggle selection state
-// function selectionChanged(dataItems) will be called on any selection change, with data items of the selected elements
-function rowClickHandler(tableSelector, selectionChanged) {
-  return function rowClick(d, i, trElements) {
-    let tableEl = d3.select(tableSelector);
-    let el = d3.select(trElements[i]);
-    if (d3.event.shiftKey || d3.event.metaKey || d3.event.ctrlKey) {
-      el.classed('selected', !el.classed('selected'));
-    } else {
-      deselectAll(tableEl);
-      el.classed('selected', true);
-    }
-    selectionChanged(getSelected(tableEl));
-  }
-}
-
 // returns a promise with tsv data from result of sparql execution on server at serverUrl
 function loadSparqlTsv(serverUrl, sparql) {
-  return new Promise(function(fulfill, reject) {
+  return new Promise(function (fulfill, reject) {
     let url = fusekiUrl(sparql);
 
     d3.tsv('http://localhost:3012/proxy?url=' + encodeURIComponent(url))
-    .mimeType('text/tab-separated-values')
-    .get(function(error, data) {
-      if (error) {
-        reject(error);
-      } else {
-        fulfill(data);
-      }
-    });
+      .mimeType('text/tab-separated-values')
+      .get(function (error, data) {
+        if (error) {
+          reject(error);
+        } else {
+          fulfill(data);
+        }
+      });
 
     function fusekiUrl(sparql) {
       return serverUrl + '?query=' + encodeURIComponent(sparql);

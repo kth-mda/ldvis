@@ -15,6 +15,25 @@ app.use(webpackDevMiddleware(webpack(config), {}));
 
 app.use(bodyParser.json());
 
+// respond with specifications json
+app.get('/mappingspecs', function(request, response) {
+  console.log('GET /mappingspecs');
+  try {
+    var text = fs.readFileSync('mappingspecs.json');
+    var textJson = JSON.parse(text);
+    response.send(text);
+  } catch (e) {
+    response.send(500, 'no valid mappingspecs.json found');
+  }
+});
+
+// save posted mapingsspecs json object
+app.post('/mappingspecs', function(request, response) {
+  console.log('POST /mappingspecs');
+  fs.writeFileSync('mappingspecs.json', JSON.stringify(request.body, null, '  '));
+  response.sendStatus(200);
+});
+
 // respond with prefixes json
 app.get('/prefixes', function(request, response) {
   try {
