@@ -1,5 +1,5 @@
 [
   {
-    "text": "select distinct ?o\nwhere {graph ?g {\n  ?s a ?o.\n}}\nlimit 10\nmapto\n          node(?o, 10, 10 + i * 40);\nend\n"
+    "text": "query\n  select distinct ?o\n  where {graph ?g {\n    ?s a ?o.\n  }}\n  limit 10\nmapto\n  node(?o)\nend\n"
   }
 ]

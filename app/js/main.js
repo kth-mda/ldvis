@@ -118,25 +118,29 @@ function specChanged() {
 
 // execute sparql query and map to diagram objects
 function runSpec(spec) {
-  let pattern = /([\s\S]*)mapto([\s\S]*)end[\s\S]*/m;
+  let pattern = /query([\s\S]*)mapto([\s\S]*)end[\s\S]*/m;
   let match = pattern.exec(spec);
   if (match) {
     diagramData = parser.rdf.createGraph();
     let sparql = match[1];
     let mapTo = match[2];
     loadSparqlTsv(urlField.value, sparql).then(function (data) {
-      // console.log(JSON.stringify(data, null, '  '));
       if (data && data.length > 0) {
-        // replace ?x in mapTo with real variables
+        // replace ?x in mapTo with obj['?x']
         _.forEach(Object.keys(data[0]), function(key) {
-          mapTo = mapTo.replace(key, "obj['" + key + "']");
+          mapTo = mapTo.replace(new RegExp('\\' + key + '\\b'), "obj['" + key + "']");
         });
 
         // compile and run
         let mapToCompiled = compileCode(mapTo);
         _.forEach(data, function(obj, i) {
-          console.log(obj['?o'], i);
-          mapToCompiled({node: addDiagramObject, obj: obj, i: i});
+          function node(id) {
+            addDiagramObject(id, 10, 10 + i * 40);
+          }
+          function line(s, p, o) {
+            addDiagramRelationObject(s, p, o, 10, 10 + i * 40);
+          }
+          mapToCompiled({node, line, obj, i});
         })
       }
       renderAll();
