@@ -118,34 +118,97 @@ function specChanged() {
 
 // execute sparql query and map to diagram objects
 function runSpec(spec) {
-  let pattern = /query([\s\S]*)mapto([\s\S]*)end[\s\S]*/m;
+  let pattern = /query([\s\S]*?)mapto([\s\S]*?)end[\s\S]*/m;
+  let type = '0';
+  diagramData = parser.rdf.createGraph();
   let match = pattern.exec(spec);
   if (match) {
-    diagramData = parser.rdf.createGraph();
-    let sparql = match[1];
+    let query = match[1];
     let mapTo = match[2];
-    loadSparqlTsv(urlField.value, sparql).then(function (data) {
+    loadSparqlTsv(urlField.value, query).then(function (data) {
       if (data && data.length > 0) {
         // replace ?x in mapTo with obj['?x']
         _.forEach(Object.keys(data[0]), function(key) {
           mapTo = mapTo.replace(new RegExp('\\' + key + '\\b'), "obj['" + key + "']");
         });
 
-        // compile and run
-        let mapToCompiled = compileCode(mapTo);
-        _.forEach(data, function(obj, i) {
-          function node(id) {
-            addDiagramObject(id, 10, 10 + i * 40);
-          }
-          function line(s, p, o) {
-            addDiagramRelationObject(s, p, o, 10, 10 + i * 40);
-          }
-          mapToCompiled({node, line, obj, i});
-        })
+        mapDataToGraph(mapTo, data, type);
       }
-      renderAll();
     });
+    type = (+type + 1).toString();
   }
+}
+
+// create graphical objects from data according to mapExpr
+function mapDataToGraph(mapExpr, data, type) {
+  // compile
+  let compiledMapTo = compileCode(mapExpr);
+  // run mapExpr to get
+  // - a configured graphical component
+  // - a function to run for each data item
+  _.forEach(data, function(obj, i) {
+    function node(id) {
+      addDiagramObject(type, id, 10, 10 + i * 40);
+      let chainObject = {
+        label: function(value) {
+          addTriple(diagramData, peelUri(id), OSLCKTH('label'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          return chainObject;
+        },
+        color: function(value) {
+          addTriple(diagramData, peelUri(id), OSLCKTH('color'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          return chainObject;
+        }
+      };
+      return chainObject;
+    }
+    function line(s, p, o) {
+      addDiagramRelationObject(type, s, p, o, 10, 10 + i * 40);
+    }
+    let mapToResult = compiledMapTo({node, line, obj, i, console});
+  })
+  renderAll();
+}
+
+// create graphical objects from data according to mapExpr
+function mapDataToGraphx(mapExpr, data, type) {
+  console.log(data);
+  // compile and run
+  let compiledMapTo = compileCode(mapExpr);
+  _.forEach(data, function(obj, i) {
+    function node(id) {
+      addDiagramObject(type, id, 10, 10 + i * 40);
+      let chainObject = {
+        label: function(expr) {
+          // eval expr and put either text at s in graph, or a function in node component that does the text retrieving when rendered
+          // console.log('label(',expr,')');
+          return chainObject;
+        }
+      };
+      return chainObject;
+    }
+    function line(s, p, o) {
+      addDiagramRelationObject(type, s, p, o, 10, 10 + i * 40);
+    }
+    let mapToResult = compiledMapTo({node, line, obj, i});
+  })
+  renderAll();
+}
+
+// adds a new diagramobject of type with representing uri at document pos x, y
+function addDiagramObject(type, uri, x, y) {
+  addTriple(diagramData, peelUri(uri), OSLCKTH('visible'), parser.rdf.createLiteral(type, null, 'http://www.w3.org/2001/XMLSchema#string'));
+  addTriple(diagramData, peelUri(uri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+  addTriple(diagramData, peelUri(uri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+}
+
+function addDiagramRelationObject(type, subjectUri, relationUri, objectUri, x, y) {
+  addTriple(diagramData, peelUri(subjectUri), peelUri(relationUri), peelUri(objectUri));
+  // if (!diagramData.some(t => t.subject.toString() === peelUri(subjectUri) && t.predicate.toString() === peelUri(relationUri))) {
+    addTriple(diagramData, peelUri(subjectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
+  // }
+  addTriple(diagramData, peelUri(objectUri), OSLCKTH('visible'), parser.rdf.createLiteral(type, null, 'http://www.w3.org/2001/XMLSchema#string'));
+  addTriple(diagramData, peelUri(objectUri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+  addTriple(diagramData, peelUri(objectUri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
 }
 
 // handle diagram
@@ -156,9 +219,19 @@ let diagramData = parser.rdf.createGraph();
 let svgComponent = new SvgComponent('top').layout(new XyLayout()
   .dataX(d => +getOneObjectString(diagramData, d, OSLCKTH('posx')))
   .dataY(d => +getOneObjectString(diagramData, d, OSLCKTH('posy'))));
-let nodeComponent = new SimpleTextBoxComponent('obj', d => [shrinkResultUri(d)])
+let nodeComponent = new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor)
   .dataId(d => d);
 let relationComponent = new RelationComponent('relation', d => [shrinkResultUri(d.text)]);
+
+function getNodeLabel(d) {
+  let result = getOneObject(diagramData, d, OSLCKTH('label'));
+  return [result ? result.toString() : d];
+}
+
+function getNodeColor(d) {
+  let result = getOneObject(diagramData, d, OSLCKTH('color'));
+  return result ? result.toString() : 'white';
+}
 
 function getChildren(parent, data) {
   if (parent) {
@@ -223,23 +296,6 @@ function peelUri(uri) {
   return (uri.length > 2 && uri[0] === '<') ? uri.substring(1, uri.length - 1) : uri;
 }
 
-// adds a new diagramobject with representing uri at document pos x, y
-function addDiagramObject(uri, x, y) {
-  let svgBounds = d3.select('svg').node().getBoundingClientRect();
-  addTriple(diagramData, peelUri(uri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-  addTriple(diagramData, peelUri(uri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-  addTriple(diagramData, peelUri(uri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-}
-
-function addDiagramRelationObject(subjectUri, relationUri, objectUri, x, y) {
-  addTriple(diagramData, peelUri(subjectUri), peelUri(relationUri), peelUri(objectUri));
-  addTriple(diagramData, peelUri(subjectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-  let svgBounds = d3.select('svg').node().getBoundingClientRect();
-  addTriple(diagramData, peelUri(objectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-  addTriple(diagramData, peelUri(objectUri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-  addTriple(diagramData, peelUri(objectUri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-}
-
 
 
 
@@ -258,7 +314,7 @@ function loadSparqlTsv(serverUrl, sparql) {
   return new Promise(function (fulfill, reject) {
     let url = fusekiUrl(sparql);
 
-    d3.tsv('http://localhost:3012/proxy?url=' + encodeURIComponent(url))
+    d3.tsv('http://localhost:3015/proxy?url=' + encodeURIComponent(url))
       .mimeType('text/tab-separated-values')
       .get(function (error, data) {
         if (error) {
