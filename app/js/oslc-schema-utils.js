@@ -1,4 +1,4 @@
-import {d3} from '../../../../../fomod-develop';
+import {d3} from '../../../fomod';
 import _ from 'lodash';
 import Promise from 'promise';
 import RdfXmlParser from 'rdf-parser-rdfxml';

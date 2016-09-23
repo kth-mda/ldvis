@@ -31,11 +31,16 @@ The app may be extended to work for OSLC compliant servers.
 ### Checkout, build and run
 
 ```
-git clone https://github.com/FindOut/ldvis.git
+git clone git@github.com:FindOut/fomod.git
+cd fomod
+npm install
+npm run dev-build
+cd ..
+git clone git@github.com:FindOut/ldvis.git
 cd ldvis
 npm install
 npm start
 ```
-The last command starts a proxy server and opens a web browser that after some seconds will show the user interface.
+The last command starts a proxy server and opens a web browser that after five seconds will show the user interface.
 
 If you dont have the git command line installed, you may download the code as a zip from the github web ui.

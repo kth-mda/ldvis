@@ -11,7 +11,7 @@ import RdfXmlParser from 'rdf-parser-rdfxml';
 import _ from 'lodash';
 import {  d3,  SvgComponent,  SimpleTextBoxComponent,  RelationComponent,  HierarchyComponent,  HBoxLayout,
   VBoxLayout,  XyLayout,  Manipulator,  MoveNodeTool,  CreateMoveRelationTool,  SelectTool,  utils
-} from '../../../../../fomod-develop';
+} from '../../../fomod';
 import {
   setTripleObject,  fetchGraph,  matchForEachTriple,  getOneObject,  getOneObjectString,
   addTriple,  renderHtmlPropsTable,  getPropsProps,  tripleToString,  graphToString

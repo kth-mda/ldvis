@@ -1,4 +1,4 @@
-import {d3} from '../../../../../fomod-develop';
+import {d3} from '../../../fomod';
 import $ from 'jquery';
 
 export function initPrefixDialog(prefixes, changedCallback) {
