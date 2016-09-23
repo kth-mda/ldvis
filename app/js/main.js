@@ -9,40 +9,17 @@ draggable();
 import Split from 'split.js';
 import RdfXmlParser from 'rdf-parser-rdfxml';
 import _ from 'lodash';
-import {
-  d3,
-  SvgComponent,
-  SimpleTextBoxComponent,
-  RelationComponent,
-  HierarchyComponent,
-  HBoxLayout,
-  VBoxLayout,
-  XyLayout,
-  Manipulator,
-  MoveNodeTool,
-  CreateMoveRelationTool,
-  SelectTool,
-  utils
+import {  d3,  SvgComponent,  SimpleTextBoxComponent,  RelationComponent,  HierarchyComponent,  HBoxLayout,
+  VBoxLayout,  XyLayout,  Manipulator,  MoveNodeTool,  CreateMoveRelationTool,  SelectTool,  utils
 } from '../../../../../fomod-develop';
 import {
-  setTripleObject,
-  fetchGraph,
-  matchForEachTriple,
-  getOneObject,
-  getOneObjectString,
-  addTriple,
-  renderHtmlPropsTable,
-  getPropsProps,
-  tripleToString,
-  graphToString
+  setTripleObject,  fetchGraph,  matchForEachTriple,  getOneObject,  getOneObjectString,
+  addTriple,  renderHtmlPropsTable,  getPropsProps,  tripleToString,  graphToString
 } from './oslc-schema-utils';
 import d3ctx from 'd3-context-menu';
 import uuid from 'node-uuid';
 import {
-  loadPrefixes,
-  savePrefixes,
-  initPrefixDialog,
-  openAddPrefixDialog
+  loadPrefixes,  savePrefixes,  initPrefixDialog,  openAddPrefixDialog
 } from './prefix-manager';
 import debounce from 'debounce';
 import {compileCode} from './compilecode';
@@ -91,10 +68,13 @@ let mappingspec = d3.select('#mappingspec');
 d3.json('/mappingspecs', function (data) {
   mappingspec.property('value', data[0].text);
 });
-mappingspec.on('keyup', function () {
+
+d3.select('body').on('keyup', function () {
   if (d3.event.ctrlKey && d3.event.key === 'r') {
+    // ctrl-r  - run spec
     runSpec(mappingspec.property('value'));
   } else {
+    // other key - save spec
     debouncedSpecChanged();
   }
 });
@@ -127,11 +107,13 @@ function runSpec(spec) {
     let mapTo = match[2];
     loadSparqlTsv(urlField.value, query).then(function (data) {
       if (data && data.length > 0) {
+        // remove comments
+        mapTo = mapTo.replace(/^\/\/.*?$/gm, '');
         // replace ?x in mapTo with obj['?x']
         _.forEach(Object.keys(data[0]), function(key) {
-          mapTo = mapTo.replace(new RegExp('\\' + key + '\\b'), "obj['" + key + "']");
+          let pattern = '\\' + key + '\\b';
+          mapTo = mapTo.replace(new RegExp(pattern, 'mg'), "obj['" + key + "']");
         });
-
         mapDataToGraph(mapTo, data, type);
       }
     });
@@ -141,8 +123,9 @@ function runSpec(spec) {
 
 // create graphical objects from data according to mapExpr
 function mapDataToGraph(mapExpr, data, type) {
-  // compile
+  // compile spec
   let compiledMapTo = compileCode(mapExpr);
+
   // run mapExpr to get
   // - a configured graphical component
   // - a function to run for each data item
@@ -157,30 +140,9 @@ function mapDataToGraph(mapExpr, data, type) {
         color: function(value) {
           addTriple(diagramData, peelUri(id), OSLCKTH('color'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
-        }
-      };
-      return chainObject;
-    }
-    function line(s, p, o) {
-      addDiagramRelationObject(type, s, p, o, 10, 10 + i * 40);
-    }
-    let mapToResult = compiledMapTo({node, line, obj, i, console});
-  })
-  renderAll();
-}
-
-// create graphical objects from data according to mapExpr
-function mapDataToGraphx(mapExpr, data, type) {
-  console.log(data);
-  // compile and run
-  let compiledMapTo = compileCode(mapExpr);
-  _.forEach(data, function(obj, i) {
-    function node(id) {
-      addDiagramObject(type, id, 10, 10 + i * 40);
-      let chainObject = {
-        label: function(expr) {
-          // eval expr and put either text at s in graph, or a function in node component that does the text retrieving when rendered
-          // console.log('label(',expr,')');
+        },
+        parent: function(value) {
+          addTriple(diagramData, peelUri(id), OSLCKTH('parent'), value);
           return chainObject;
         }
       };
@@ -189,7 +151,7 @@ function mapDataToGraphx(mapExpr, data, type) {
     function line(s, p, o) {
       addDiagramRelationObject(type, s, p, o, 10, 10 + i * 40);
     }
-    let mapToResult = compiledMapTo({node, line, obj, i});
+    let mapToResult = compiledMapTo({node, line, obj, i, console});
   })
   renderAll();
 }
