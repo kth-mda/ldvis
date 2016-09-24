@@ -3,9 +3,9 @@ import _ from 'lodash';
 import Promise from 'promise';
 import RdfXmlParser from 'rdf-parser-rdfxml';
 
-let OSLC = suffix => 'http://open-services.net/ns/core#' + suffix;
-let RDF = suffix => 'http://www.w3.org/1999/02/22-rdf-syntax-ns#' + suffix;
-let OSLCKTH = suffix => 'http://oslc.kth.se/core#' + suffix;
+export let OSLC = suffix => 'http://open-services.net/ns/core#' + suffix;
+export let RDF = suffix => 'http://www.w3.org/1999/02/22-rdf-syntax-ns#' + suffix;
+export let OSLCKTH = suffix => 'http://oslc.kth.se/core#' + suffix;
 
 let parser = new RdfXmlParser();
 let xmlParser = new DOMParser();
@@ -106,6 +106,16 @@ export function getOneObject(graph, subject, predicate) {
   let triples = graph.match(subject, predicate, null);
   if (triples.length) {
     return triples.toArray()[0].object;
+  } else {
+    return null;
+  }
+}
+
+// returns the first object having the specified subject and predicate, or null if not found
+export function getOneSubject(graph, predicate, object) {
+  let triples = graph.match(null, predicate, object);
+  if (triples.length) {
+    return triples.toArray()[0].subject;
   } else {
     return null;
   }

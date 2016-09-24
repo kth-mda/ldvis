@@ -13,8 +13,8 @@ import {  d3,  SvgComponent,  SimpleTextBoxComponent,  RelationComponent,  Hiera
   VBoxLayout,  XyLayout,  Manipulator,  MoveNodeTool,  CreateMoveRelationTool,  SelectTool,  utils
 } from '../../../fomod';
 import {
-  setTripleObject,  fetchGraph,  matchForEachTriple,  getOneObject,  getOneObjectString,
-  addTriple,  renderHtmlPropsTable,  getPropsProps,  tripleToString,  graphToString
+  setTripleObject,  fetchGraph,  matchForEachTriple,  matchForEach, getOneObject,  getOneObjectString, getOneSubject,
+  addTriple,  renderHtmlPropsTable,  getPropsProps,  tripleToString,  graphToString, RDF
 } from './oslc-schema-utils';
 import d3ctx from 'd3-context-menu';
 import uuid from 'node-uuid';
@@ -131,10 +131,11 @@ function mapDataToGraph(mapExpr, data, type) {
   // - a function to run for each data item
   _.forEach(data, function(obj, i) {
     function node(id) {
-      addDiagramObject(type, id, 10, 10 + i * 40);
+      addDiagramObject(id, 10, 10 + i * 40);
       let chainObject = {
-        label: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('label'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
+        label: function(...lines) {
+          let nlSeparated = _.map(lines, shrinkResultUri).join('\n')
+          addTriple(diagramData, peelUri(id), OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         },
         color: function(value) {
@@ -149,7 +150,16 @@ function mapDataToGraph(mapExpr, data, type) {
       return chainObject;
     }
     function line(s, p, o) {
-      addDiagramRelationObject(type, s, p, o, 10, 10 + i * 40);
+      let relationUri = addDiagramRelationObject(s, p, o, 10, 10 + i * 40);
+      let chainObject = {
+        label: function(...lines) {
+          let nlSeparated = _.map(lines, shrinkResultUri).join('\n')
+          console.log('nlSeparated', relationUri, nlSeparated);
+          addTriple(diagramData, relationUri, OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          return chainObject;
+        }
+      };
+      return chainObject;
     }
     let mapToResult = compiledMapTo({node, line, obj, i, console});
   })
@@ -157,20 +167,25 @@ function mapDataToGraph(mapExpr, data, type) {
 }
 
 // adds a new diagramobject of type with representing uri at document pos x, y
-function addDiagramObject(type, uri, x, y) {
-  addTriple(diagramData, peelUri(uri), OSLCKTH('visible'), parser.rdf.createLiteral(type, null, 'http://www.w3.org/2001/XMLSchema#string'));
+function addDiagramObject(uri, x, y) {
+  addTriple(diagramData, peelUri(uri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
   addTriple(diagramData, peelUri(uri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
   addTriple(diagramData, peelUri(uri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+
+  return uri;
 }
 
-function addDiagramRelationObject(type, subjectUri, relationUri, objectUri, x, y) {
-  addTriple(diagramData, peelUri(subjectUri), peelUri(relationUri), peelUri(objectUri));
-  // if (!diagramData.some(t => t.subject.toString() === peelUri(subjectUri) && t.predicate.toString() === peelUri(relationUri))) {
-    addTriple(diagramData, peelUri(subjectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-  // }
-  addTriple(diagramData, peelUri(objectUri), OSLCKTH('visible'), parser.rdf.createLiteral(type, null, 'http://www.w3.org/2001/XMLSchema#string'));
-  addTriple(diagramData, peelUri(objectUri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-  addTriple(diagramData, peelUri(objectUri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+function addDiagramRelationObject(subjectUri, relationUri, objectUri) {
+  let relationSubject = parser.rdf.createBlankNode();
+  addTriple(diagramData, relationSubject, RDF('type'), OSLCKTH('relation'));
+  addTriple(diagramData, relationSubject, OSLCKTH('from'), peelUri(subjectUri));
+  addTriple(diagramData, relationSubject, OSLCKTH('relationUri'), peelUri(relationUri));
+  addTriple(diagramData, relationSubject, OSLCKTH('to'), peelUri(objectUri));
+
+  addTriple(diagramData, peelUri(subjectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
+  addTriple(diagramData, peelUri(objectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
+
+  return relationSubject;
 }
 
 // handle diagram
@@ -181,13 +196,18 @@ let diagramData = parser.rdf.createGraph();
 let svgComponent = new SvgComponent('top').layout(new XyLayout()
   .dataX(d => +getOneObjectString(diagramData, d, OSLCKTH('posx')))
   .dataY(d => +getOneObjectString(diagramData, d, OSLCKTH('posy'))));
-let nodeComponent = new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor)
+let nodeComponent = new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
   .dataId(d => d);
-let relationComponent = new RelationComponent('relation', d => [shrinkResultUri(d.text)]);
+let relationComponent = new RelationComponent('relation').label(getRelationLabel).tooltip(d=>d.relationUri);
 
 function getNodeLabel(d) {
   let result = getOneObject(diagramData, d, OSLCKTH('label'));
-  return [result ? result.toString() : d];
+  return result ? result.toString().split('\n') : [d];
+}
+
+function getRelationLabel(d) {
+  let result = getOneObject(diagramData, d.id, OSLCKTH('label'));
+  return result ? result.toString().split('\n') : [d.relationUri];
 }
 
 function getNodeColor(d) {
@@ -211,15 +231,18 @@ function getComponent(dataItem) {
 function getRelations() {
   let relations = [];
   let visibleObjects = diagramData.filter(t => t.predicate.toString() === OSLCKTH('visible'));
-  diagramData.toArray().forEach(function (triple) {
-    if (visibleObjects.some(t => t.subject.toString() === triple.subject.toString()) &&
-      visibleObjects.some(t => t.subject.toString() === triple.object.toString())) {
+  matchForEachTriple(diagramData, null, RDF('type'), OSLCKTH('relation'), function (relationTypeTriple) {
+    let from = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('from'))
+    let relationUri = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('relationUri'))
+    let to = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('to'))
+    if (visibleObjects.some(t => t.subject.toString() === from.toString()) &&
+      visibleObjects.some(t => t.subject.toString() === to.toString())) {
       // both subject and object of this relation is visible in diagram
       relations.push({
-        id: uuid.v4(),
-        from: triple.subject.toString(),
-        to: triple.object.toString(),
-        text: triple.predicate.toString()
+        id: relationTypeTriple.subject,
+        from: from.toString(),
+        to: to.toString(),
+        relationUri: relationUri.toString()
       })
     }
   });
