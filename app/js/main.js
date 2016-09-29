@@ -24,8 +24,7 @@ import {
 import debounce from 'debounce';
 import {compileCode} from './compilecode';
 
-// let initialServerUrl = 'https://vservices.offis.de/rtp/fuseki/v1.0/ldr/query';
-let initialServerUrl = 'http://localhost:8080/openrdf-sesame/repositories/scania';
+let initialServerUrl = 'https://git.md.kth.se/fuseki/import-cpse/query';
 
 var parser = new RdfXmlParser();
 
@@ -65,7 +64,7 @@ urlField.onchange = function () {
 
 // init mapping spec field
 let mappingspec = d3.select('#mappingspec');
-d3.json('/mappingspecs', function (data) {
+d3.json('mappingspecs', function (data) {
   mappingspec.property('value', data[0].text);
 });
 
@@ -299,7 +298,7 @@ function loadSparqlTsv(serverUrl, sparql) {
   return new Promise(function (fulfill, reject) {
     let url = fusekiUrl(sparql);
 
-    d3.tsv('http://localhost:3015/proxy?url=' + encodeURIComponent(url))
+    d3.tsv('proxy?url=' + encodeURIComponent(url))
       .mimeType('text/tab-separated-values')
       .get(function (error, data) {
         if (error) {
