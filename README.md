@@ -23,7 +23,7 @@ The app may be extended to work for OSLC compliant servers.
 
 ### Prerequisites
 
-- access to https://github.com/FindOut/ldvis.git
+- access to https://github.com/FindOut/fomod
 - node installed - see https://nodejs.org
 - git command line (optional)
 - google chrome browser - Firefox and IE11+ will be supported later
