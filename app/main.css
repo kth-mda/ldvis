@@ -9,10 +9,23 @@ input, textarea {
   font-size: 10pt;
   border-left: 0;
   border-right: 0;
+  resize: none;
 }
 
 input {
   width: 100%;
+}
+
+#toolbar {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  padding: .4em .4em .2em .2em;
+  background-color: #eee;
+}
+
+svg {
+  background-color: #eee;
 }
 
 .node {
@@ -105,7 +118,7 @@ table tr.selected td {
 }
 
 .gutter {
-  background-color: #444;
+  background-color: #666;
 
   background-repeat: no-repeat;
   background-position: 50%;

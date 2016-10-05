@@ -2,13 +2,14 @@
 
 A web app that visualizes objects and relations in a triple store based on a mapping specification.
 
-The user specifies
+The user enters a specification and clicks Run to render a diagram according to the specification.
 
-- a mapping specification
-- a triple store server URL
+![Linked Data Visualizer window](docs/ldvis-window.png)
 
 The mapping specification tells
 
+- which server to run the query
+- a SPARQL query getting the data to visualize
 - which object types to display as grahical nodes of a certain shape
 - which relations to display as lines between the nodes
 - which relations to display as nodes nested inside each others

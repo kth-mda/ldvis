@@ -1,5 +1,10 @@
 import {d3} from '../../../fomod';
 import $ from 'jquery';
+import _ from 'lodash';
+
+export function getSparqlPrefixes(prefixes) {
+  return _.map(Object.keys(prefixes), key => 'PREFIX ' + key + ': <' + prefixes[key] + '>').join('\n');
+}
 
 export function initPrefixDialog(prefixes, changedCallback) {
   // $("#add-prefix-dialog").dialog({
@@ -37,11 +42,19 @@ export function openAddPrefixDialog(uri) {
 }
 
 export function loadPrefixes(prefixes, url='prefixes') {
-  d3.json('/' + url, function(json) {
-      for (let key in json) {
-        prefixes[key] = json[key];
+  return new Promise(function(fulfill, reject) {
+    d3.json('/' + url, function(json) {
+      if (json) {
+        console.log(arguments);
+        for (let key in json) {
+          prefixes[key] = json[key];
+        }
+        fulfill(json);
+      } else {
+        reject();
       }
-  })
+    });
+  });
 }
 
 export function savePrefixes(prefixes, url='prefixes') {

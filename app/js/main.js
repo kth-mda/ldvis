@@ -19,7 +19,7 @@ import {
 import d3ctx from 'd3-context-menu';
 import uuid from 'node-uuid';
 import {
-  loadPrefixes,  savePrefixes,  initPrefixDialog,  openAddPrefixDialog
+  loadPrefixes, getSparqlPrefixes, savePrefixes,  initPrefixDialog,  openAddPrefixDialog
 } from './prefix-manager';
 import debounce from 'debounce';
 import {compileCode} from './compilecode';
@@ -30,18 +30,14 @@ var parser = new RdfXmlParser();
 
 let contextMenu = d3ctx(d3);
 
-// returns uri shrinked by using prefix form for defined prefixes
-// if uri has the form <xxxyyy> then the prefixed form is prefix:yyy
-function shrinkResultUri(uri) {
-  if (uri.length > 2 && uri[0] === '<') {
-    uri = uri.substring(1, uri.length - 1);
-  }
-  return parser.rdf.prefixes.shrink(uri);
-}
+loadPrefixes(parser.rdf.prefixes).then(function() {
+  console.log(parser.rdf.prefixes.shrink('https://vservices.offis.de/rtp/simulink/v1.0/services/qwe'));
+});
+
 
 // handle page layout
 function adjustUISize() {
-  $('#ui').height($(window).innerHeight() - 2);
+  $('#ui').height($(window).innerHeight());
 }
 $(window).resize(adjustUISize);
 adjustUISize();
@@ -53,32 +49,36 @@ Split(['#leftcol', '#rightcol'], {
   snapOffset: 1
 });
 
-
-// init url field
-let urlField = d3.select('#urlField').node();
-urlField.value = initialServerUrl;
-urlField.onchange = function () {
-  initialServerUrl = urlField.value;
-  console.log('changed url to', initialServerUrl);
-};
-
 // init mapping spec field
 let mappingspec = d3.select('#mappingspec');
 d3.json('mappingspecs', function (data) {
   mappingspec.property('value', data[0].text);
 });
 
+function getAllTextOrSelection() {
+  let from = mappingspec.node().selectionStart;
+  let to = mappingspec.node().selectionEnd;
+  if (from !== to) {
+    return mappingspec.property('value').substring(from, to);
+  }
+  return mappingspec.property('value');
+}
+
 d3.select('body').on('keyup', function () {
   if (d3.event.ctrlKey && d3.event.key === 'r') {
     // ctrl-r  - run spec
-    runSpec(mappingspec.property('value'));
+    runSpec(getAllTextOrSelection());
   } else {
     // other key - save spec
     debouncedSpecChanged();
   }
 });
 
-let debouncedSpecChanged = debounce(specChanged, 1000);
+d3.select('#runButton').on('click', function() {
+  runSpec(getAllTextOrSelection());
+});
+
+let debouncedSpecChanged = debounce(specChanged, 5000);
 
 function specChanged() {
   console.log('saving mappingspec');
@@ -95,16 +95,23 @@ function specChanged() {
   }]));
 }
 
+function addPrefixes(query) {
+  return getSparqlPrefixes(parser.rdf.prefixes) + '\n' + query;
+}
+
 // execute sparql query and map to diagram objects
 function runSpec(spec) {
-  let pattern = /query([\s\S]*?)mapto([\s\S]*?)end[\s\S]*/m;
+  let pattern = /server([\s\S]*?)\nquery([\s\S]*?)mapto([\s\S]*?)end[\s\S]*/m;
   let type = '0';
   diagramData = parser.rdf.createGraph();
   let match = pattern.exec(spec);
   if (match) {
-    let query = match[1];
-    let mapTo = match[2];
-    loadSparqlTsv(urlField.value, query).then(function (data) {
+    let server = match[1];
+    let query = match[2];
+    let mapTo = match[3];
+
+    query = addPrefixes(query);
+    loadSparqlTsv(server, query).then(function (data) {
       if (data && data.length > 0) {
         // remove comments
         mapTo = mapTo.replace(/^\/\/.*?$/gm, '');
@@ -201,7 +208,7 @@ let relationComponent = new RelationComponent('relation').label(getRelationLabel
 
 function getNodeLabel(d) {
   let result = getOneObject(diagramData, d, OSLCKTH('label'));
-  return result ? result.toString().split('\n') : [d];
+  return result ? result.toString().split('\n') : [parser.rdf.prefixes.shrink(d)];
 }
 
 function getRelationLabel(d) {
@@ -280,9 +287,6 @@ function peelUri(uri) {
   return (uri.length > 2 && uri[0] === '<') ? uri.substring(1, uri.length - 1) : uri;
 }
 
-
-
-
 // deselect all elements inside parentElement
 function deselectAll(parentElement) {
   parentElement.selectAll('.selected').classed('selected', false);
@@ -312,4 +316,12 @@ function loadSparqlTsv(serverUrl, sparql) {
       return serverUrl + '?query=' + encodeURIComponent(sparql);
     }
   });
+}
+// returns uri shrinked by using prefix form for defined prefixes
+// if uri has the form <xxxyyy> then the prefixed form is prefix:yyy
+function shrinkResultUri(uri) {
+  if (uri.length > 2 && uri[0] === '<') {
+    uri = uri.substring(1, uri.length - 1);
+  }
+  return parser.rdf.prefixes.shrink(uri);
 }
