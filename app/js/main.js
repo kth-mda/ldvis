@@ -213,7 +213,7 @@ function getNodeLabel(d) {
 
 function getRelationLabel(d) {
   let result = getOneObject(diagramData, d.id, OSLCKTH('label'));
-  return result ? result.toString().split('\n') : [d.relationUri];
+  return result ? result.toString().split('\n') : [parser.rdf.prefixes.shrink(d.relationUri)];
 }
 
 function getNodeColor(d) {
