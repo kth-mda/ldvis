@@ -149,7 +149,7 @@ function mapDataToGraph(mapExpr, data, type) {
           return chainObject;
         },
         parent: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('parent'), value);
+          addTriple(diagramData, peelUri(id), OSLCKTH('parent'), peelUri(value));
           return chainObject;
         }
       };
@@ -160,7 +160,6 @@ function mapDataToGraph(mapExpr, data, type) {
       let chainObject = {
         label: function(...lines) {
           let nlSeparated = _.map(lines, shrinkResultUri).join('\n')
-          console.log('nlSeparated', relationUri, nlSeparated);
           addTriple(diagramData, relationUri, OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         }
@@ -168,7 +167,8 @@ function mapDataToGraph(mapExpr, data, type) {
       return chainObject;
     }
     let mapToResult = compiledMapTo({node, line, obj, i, console});
-  })
+  });
+  //console.log('diagramData', graphToString(diagramData));
   renderAll();
 }
 
@@ -199,11 +199,15 @@ let OSLCKTH = suffix => 'http://oslc.kth.se/ldexplorer#' + suffix;
 
 let diagramData = parser.rdf.createGraph();
 
+function simplifyId(id) {
+    return id.replace(/[:/.]/g, '-');
+}
+
 let svgComponent = new SvgComponent('top').layout(new XyLayout()
   .dataX(d => +getOneObjectString(diagramData, d, OSLCKTH('posx')))
   .dataY(d => +getOneObjectString(diagramData, d, OSLCKTH('posy'))));
 let nodeComponent = new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-  .dataId(d => d);
+  .dataId(d => simplifyId(d));
 let relationComponent = new RelationComponent('relation').label(getRelationLabel).tooltip(d=>d.relationUri);
 
 function getNodeLabel(d) {
@@ -222,10 +226,14 @@ function getNodeColor(d) {
 }
 
 function getChildren(parent, data) {
+  let parentLessSubject = triple => data.match(triple.subject, OSLCKTH('parent'), null).length == 0;
   if (parent) {
-    return [];
+    let children = data.match(null, OSLCKTH('parent'), parent).toArray();
+    // console.log('children', children);
+    return _.map(children, d => d.subject.toString());
   } else {
-    let visibleObjects = data.match(null, OSLCKTH('visible'), null).toArray();
+    let visibleObjects = data.match(null, OSLCKTH('visible'), null)
+      .filter(parentLessSubject).toArray();
     return _.map(visibleObjects, d => d.subject.toString());
   }
 }
