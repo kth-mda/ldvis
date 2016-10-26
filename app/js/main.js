@@ -144,12 +144,20 @@ function mapDataToGraph(mapExpr, data, type) {
           addTriple(diagramData, peelUri(id), OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         },
+        cornerRadius: function(radius) {
+          addTriple(diagramData, peelUri(id), OSLCKTH('cornerRadius'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+          return chainObject;
+        },
         color: function(value) {
           addTriple(diagramData, peelUri(id), OSLCKTH('color'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         },
         parent: function(value) {
           addTriple(diagramData, peelUri(id), OSLCKTH('parent'), peelUri(value));
+          return chainObject;
+        },
+        layout: function(value) {
+          addTriple(diagramData, peelUri(id), OSLCKTH('layout'), peelUri(value));
           return chainObject;
         }
       };
@@ -168,7 +176,9 @@ function mapDataToGraph(mapExpr, data, type) {
     }
     let mapToResult = compiledMapTo({node, line, obj, i, console});
   });
-  //console.log('diagramData', graphToString(diagramData));
+
+  d3.select('svg').selectAll('.node').remove();
+  hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
   renderAll();
 }
 
@@ -199,6 +209,7 @@ let OSLCKTH = suffix => 'http://oslc.kth.se/ldexplorer#' + suffix;
 
 let diagramData = parser.rdf.createGraph();
 
+// make id usable as a valid part of a d3.select expression, by replacing some chars by -
 function simplifyId(id) {
     return id.replace(/[:/.]/g, '-');
 }
@@ -206,9 +217,24 @@ function simplifyId(id) {
 let svgComponent = new SvgComponent('top').layout(new XyLayout()
   .dataX(d => +getOneObjectString(diagramData, d, OSLCKTH('posx')))
   .dataY(d => +getOneObjectString(diagramData, d, OSLCKTH('posy'))));
-let nodeComponent = new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-  .dataId(d => simplifyId(d));
+let nodeComponent = new SimpleTextBoxComponent('obj')
+  .dataId(d => simplifyId(d)).label(getNodeLabel).tooltip(d=>d)
+  .backgroundColor(getNodeColor).cornerRadius(getNodeCornerRadius);
 let relationComponent = new RelationComponent('relation').label(getRelationLabel).tooltip(d=>d.relationUri);
+
+
+
+let nodeComponentByLayout = {
+  'xy': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
+    .dataId(d => simplifyId(d)).layout(new XyLayout()),
+  'hbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
+    .dataId(d => simplifyId(d)).layout(new HBoxLayout()),
+  'vbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
+    .dataId(d => simplifyId(d)).layout(new VBoxLayout())
+};
+for (let c in nodeComponentByLayout) {
+  nodeComponentByLayout[c].componentLayoutName = c;
+}
 
 function getNodeLabel(d) {
   let result = getOneObject(diagramData, d, OSLCKTH('label'));
@@ -225,6 +251,11 @@ function getNodeColor(d) {
   return result ? result.toString() : 'white';
 }
 
+function getNodeCornerRadius(d) {
+  let result = getOneObject(diagramData, d, OSLCKTH('cornerRadius'));
+  return result ? +result.toString() : 0;
+}
+
 function getChildren(parent, data) {
   let parentLessSubject = triple => data.match(triple.subject, OSLCKTH('parent'), null).length == 0;
   if (parent) {
@@ -238,8 +269,12 @@ function getChildren(parent, data) {
   }
 }
 
-function getComponent(dataItem) {
-  return nodeComponent;
+function getComponent(d) {
+  let layoutName = getOneObjectString(diagramData, d, OSLCKTH('layout'));
+  let nodeComponentResult = nodeComponentByLayout[layoutName];
+  let component = nodeComponentResult || nodeComponent;
+  console.log('getComponent(',d,') layout=', layoutName, ',', component.layout().layoutName);
+  return component;
 }
 
 function getRelations() {
