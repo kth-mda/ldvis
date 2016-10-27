@@ -152,6 +152,10 @@ function mapDataToGraph(mapExpr, data, type) {
           addTriple(diagramData, peelUri(id), OSLCKTH('color'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         },
+        borderColor: function(value) {
+          addTriple(diagramData, peelUri(id), OSLCKTH('borderColor'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          return chainObject;
+        },
         parent: function(value) {
           addTriple(diagramData, peelUri(id), OSLCKTH('parent'), peelUri(value));
           return chainObject;
@@ -219,7 +223,8 @@ let svgComponent = new SvgComponent('top').layout(new XyLayout()
   .dataY(d => +getOneObjectString(diagramData, d, OSLCKTH('posy'))));
 let nodeComponent = new SimpleTextBoxComponent('obj')
   .dataId(d => simplifyId(d)).label(getNodeLabel).tooltip(d=>d)
-  .backgroundColor(getNodeColor).cornerRadius(getNodeCornerRadius);
+  .backgroundColor(getNodeColor).foregroundColor(getNodeForegroundColor)
+  .cornerRadius(getNodeCornerRadius);
 let relationComponent = new RelationComponent('relation').label(getRelationLabel).tooltip(d=>d.relationUri);
 
 
@@ -249,6 +254,11 @@ function getRelationLabel(d) {
 function getNodeColor(d) {
   let result = getOneObject(diagramData, d, OSLCKTH('color'));
   return result ? result.toString() : 'white';
+}
+
+function getNodeForegroundColor(d) {
+  let result = getOneObject(diagramData, d, OSLCKTH('borderColor'));
+  return result ? result.toString() : 'black';
 }
 
 function getNodeCornerRadius(d) {
