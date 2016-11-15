@@ -10,7 +10,7 @@ import Split from 'split.js';
 import RdfXmlParser from 'rdf-parser-rdfxml';
 import _ from 'lodash';
 import {  d3,  SvgComponent,  SimpleTextBoxComponent,  RelationComponent,  HierarchyComponent,  HBoxLayout,
-  VBoxLayout,  XyLayout,  Manipulator,  MoveNodeTool,  CreateMoveRelationTool,  SelectTool,  utils
+  VBoxLayout,  XyLayout,  Manipulator,  MoveNodeTool,  CreateMoveRelationTool,  SelectTool,  utils, separateOverlappingRelations
 } from '../../../fomod';
 import {
   setTripleObject,  fetchGraph,  matchForEachTriple,  matchForEach, getOneObject,  getOneObjectString, getOneSubject,
@@ -30,10 +30,8 @@ var parser = new RdfXmlParser();
 
 let contextMenu = d3ctx(d3);
 
-loadPrefixes(parser.rdf.prefixes).then(function() {
-  console.log(parser.rdf.prefixes.shrink('https://vservices.offis.de/rtp/simulink/v1.0/services/qwe'));
-});
-
+// loadPrefixes(parser.rdf.prefixes).then(function() {
+// });
 
 // handle page layout
 function adjustUISize() {
@@ -99,18 +97,50 @@ function addPrefixes(query) {
   return getSparqlPrefixes(parser.rdf.prefixes) + '\n' + query;
 }
 
+// returns the text on the first line of s
+function getLineWord(s) {
+  let wordText = /^\s*[^\n]*/.exec(s);
+  if (wordText) {
+    return wordText[0];
+  }
+  return null;
+}
+
+let prefixHandler = new PrefixHandler();
+
+// for each spec in text, calls specHandler(server, query, mapTo)
+function getSpecs(text, specHandler) {
+  let isGroup = false;
+  let n = 0;
+  let word = getLineWord(text);
+  if (word.trim() === 'group') {
+    isGroup = true;
+    n += word.length;
+  }
+  let maxSpecs = 10;
+  while (true) {
+    text = text.substring(n);
+    if (getLineWord(text).trim() === 'end' || maxSpecs-- <= 0) {
+      break;
+    }
+    let pattern = /\s+server([\s\S]*?)\n\s*query([\s\S]*?)mapto([\s\S]*?)end\b/m;
+    let match = pattern.exec(text);
+    if (match) {
+      let server = match[1];
+      let query = match[2];
+      let mapTo = match[3];
+      specHandler(server, query, mapTo);
+    }
+    n = match[0].length;
+  }
+}
+
 // execute sparql query and map to diagram objects
 function runSpec(spec) {
-  let pattern = /server([\s\S]*?)\nquery([\s\S]*?)mapto([\s\S]*?)end[\s\S]*/m;
   let type = '0';
   diagramData = parser.rdf.createGraph();
-  let match = pattern.exec(spec);
-  if (match) {
-    let server = match[1];
-    let query = match[2];
-    let mapTo = match[3];
-
-    query = addPrefixes(query);
+  getSpecs(spec, function(server, query, mapTo) {
+//    query = addPrefixes(query);
     loadSparqlTsv(server, query).then(function (data) {
       if (data && data.length > 0) {
         // remove comments
@@ -124,7 +154,7 @@ function runSpec(spec) {
       }
     });
     type = (+type + 1).toString();
-  }
+  });
 }
 
 // create graphical objects from data according to mapExpr
@@ -148,6 +178,14 @@ function mapDataToGraph(mapExpr, data, type) {
           addTriple(diagramData, peelUri(id), OSLCKTH('cornerRadius'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
           return chainObject;
         },
+        padding: function(radius) {
+          addTriple(diagramData, peelUri(id), OSLCKTH('padding'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+          return chainObject;
+        },
+        margin: function(radius) {
+          addTriple(diagramData, peelUri(id), OSLCKTH('margin'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+          return chainObject;
+        },
         color: function(value) {
           addTriple(diagramData, peelUri(id), OSLCKTH('color'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
@@ -158,6 +196,11 @@ function mapDataToGraph(mapExpr, data, type) {
         },
         parent: function(value) {
           addTriple(diagramData, peelUri(id), OSLCKTH('parent'), peelUri(value));
+          return chainObject;
+        },
+        tooltip: function(value) {
+          console.log('node tooltip', value);
+          addTriple(diagramData, peelUri(id), OSLCKTH('tooltip'), peelUri(value));
           return chainObject;
         },
         layout: function(value) {
@@ -178,7 +221,7 @@ function mapDataToGraph(mapExpr, data, type) {
       };
       return chainObject;
     }
-    let mapToResult = compiledMapTo({node, line, obj, i, console});
+    let mapToResult = compiledMapTo({node, line, obj, i, console, prefixes: prefixHandler});
   });
 
   d3.select('svg').selectAll('.node').remove();
@@ -231,11 +274,11 @@ let relationComponent = new RelationComponent('relation').label(getRelationLabel
 
 let nodeComponentByLayout = {
   'xy': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-    .dataId(d => simplifyId(d)).layout(new XyLayout()),
+    .dataId(d => simplifyId(d)).layout(new XyLayout()).minSize({width: 10, height: 10}),
   'hbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-    .dataId(d => simplifyId(d)).layout(new HBoxLayout()),
+    .dataId(d => simplifyId(d)).layout(new HBoxLayout()).minSize({width: 10, height: 10}),
   'vbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-    .dataId(d => simplifyId(d)).layout(new VBoxLayout())
+    .dataId(d => simplifyId(d)).layout(new VBoxLayout()).minSize({width: 10, height: 10})
 };
 for (let c in nodeComponentByLayout) {
   nodeComponentByLayout[c].componentLayoutName = c;
@@ -261,6 +304,12 @@ function getNodeForegroundColor(d) {
   return result ? result.toString() : 'black';
 }
 
+function getTooltip(d) {
+  let result = getOneObject(diagramData, d, OSLCKTH('tooltip'));
+  console.log('tooltip', result);
+  return result ? result.toString() : d;
+}
+
 function getNodeCornerRadius(d) {
   let result = getOneObject(diagramData, d, OSLCKTH('cornerRadius'));
   return result ? +result.toString() : 0;
@@ -270,7 +319,6 @@ function getChildren(parent, data) {
   let parentLessSubject = triple => data.match(triple.subject, OSLCKTH('parent'), null).length == 0;
   if (parent) {
     let children = data.match(null, OSLCKTH('parent'), parent).toArray();
-    // console.log('children', children);
     return _.map(children, d => d.subject.toString());
   } else {
     let visibleObjects = data.match(null, OSLCKTH('visible'), null)
@@ -283,7 +331,6 @@ function getComponent(d) {
   let layoutName = getOneObjectString(diagramData, d, OSLCKTH('layout'));
   let nodeComponentResult = nodeComponentByLayout[layoutName];
   let component = nodeComponentResult || nodeComponent;
-  console.log('getComponent(',d,') layout=', layoutName, ',', component.layout().layoutName);
   return component;
 }
 
@@ -330,6 +377,7 @@ function renderAll() {
   relsEls.each(function (d) {
     this.fomod.layout(d3.select(this));
   });
+  separateOverlappingRelations(relsEls);
 
   d3.selectAll('#rightcol .obj')
     .call(manipulator);
@@ -373,8 +421,49 @@ function loadSparqlTsv(serverUrl, sparql) {
 // returns uri shrinked by using prefix form for defined prefixes
 // if uri has the form <xxxyyy> then the prefixed form is prefix:yyy
 function shrinkResultUri(uri) {
+  return parser.rdf.prefixes.shrink(peelUri(uri));
+}
+
+function peelUri(uri) {
   if (uri.length > 2 && uri[0] === '<') {
     uri = uri.substring(1, uri.length - 1);
   }
-  return parser.rdf.prefixes.shrink(uri);
+  return uri;
+}
+
+function PrefixHandler() {
+  return {
+    // adds prefix with iri to the prefixes
+    add: function(prefix, iri) {
+      let uri = iri.toString();
+      if (uri.length > 2 && uri[0] === '<') {
+        uri = uri.substring(1, uri.length - 1);
+      }
+      if (!parser.rdf.prefixes[prefix]){
+        parser.rdf.prefixes[prefix] = uri;
+      }
+    },
+    // if iri has a known prefix, then return the prefix, else return the defaultValue parameter
+    getPrefix: function(uri, defaultValue) {
+      let shrinked = parser.rdf.prefixes.shrink(uri.toString());
+      if (shrinked !== uri) {
+        return shrinked.substring(0, shrinked.indexOf(':'));
+      } else {
+        return defaultValue;
+      }
+    },
+    // if uri has a known prefix, then return uri with the prefix removed
+    removePrefix: function(iri) {
+      let uri = peelUri(iri);
+      let shrinked = parser.rdf.prefixes.shrink(uri.toString());
+      if (shrinked !== uri) {
+        return shrinked.substring(shrinked.indexOf(':') + 1);
+      } else {
+        return uri;
+      }
+    },
+    shrink: function(uri) {
+      return shrinkResultUri(uri);
+    }
+  }
 }

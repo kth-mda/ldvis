@@ -1,0 +1,383 @@
+group
+  server
+    http://localhost:8080/openrdf-sesame/repositories/bugzilla
+  query
+    # list all resource types found in property ranges
+    # where ?range is ?prefix:?rangeName ?prefixBase
+    PREFIX oslc: <http://open-services.net/ns/core#>
+    select distinct ?range ?prefix ?rangeName
+    where {
+      ?sp a oslc:ServiceProvider.
+      ?sp oslc:service/(oslc:queryCapability|oslc:creationFactory) ?cap.
+      ?cap oslc:resourceShape/oslc:property/oslc:range ?range.
+      ?pn a oslc:PrefixDefinition.
+      ?pn oslc:prefix ?prefix.
+      ?pn oslc:prefixBase ?prefixBase.
+      filter( regex(str(?range), str(?prefixBase))).
+      bind(substr(str(?range), strlen(str(?prefixBase)) + 1) as ?rangeName).
+    }
+    order by ?rangeName
+  mapto
+    node('DomainSpecification').color('none').borderColor('none').label('').layout('hbox');
+    node(?prefix).tooltip('qwe').parent('DomainSpecification').color('lightgray');
+    node(?rangeName).parent(?prefix).color('#F3F393').cornerRadius(5);
+  end
+
+  server
+    http://localhost:8080/openrdf-sesame/repositories/bugzilla
+  query
+    # list all resource types found in service capability resourceType
+    # where ?range is ?prefix:?rangeName
+    PREFIX oslc: <http://open-services.net/ns/core#>
+    select distinct ?rt ?prefix ?rtName ?prefixBase
+    where {
+      ?sp a oslc:ServiceProvider.
+      ?sp   oslc:service/(oslc:queryCapability|oslc:creationFactory)
+          /oslc:resourceType ?rt.
+      ?pn a oslc:PrefixDefinition.
+      ?pn oslc:prefix ?prefix.
+      ?pn oslc:prefixBase ?prefixBase.
+      filter( regex(str(?rt), str(?prefixBase))).
+      bind(substr(str(?rt), strlen(str(?prefixBase)) + 1) as ?rtName).
+    }
+    order by ?rtName
+  mapto
+    node('DomainSpecification').color('none').borderColor('none').label('').layout('hbox');
+    node(?prefix).tooltip('qwe').label(?prefix).parent('DomainSpecification').color('lightgray');
+    node(?rtName).color('white').parent(?prefix);
+  end
+
+  server
+    http://localhost:8080/openrdf-sesame/repositories/bugzilla
+  query
+    # list all properties by resource type
+    PREFIX oslc: <http://open-services.net/ns/core#>
+
+    select distinct ?rt ?prefix ?rtName ?pr ?prName ?prDef ?prRange ?prValueType
+    where {
+      ?sp a oslc:ServiceProvider.
+      ?sp   oslc:service/(oslc:queryCapability|oslc:creationFactory) ?cap.
+      ?cap oslc:resourceType ?rt.
+
+      ?pn a oslc:PrefixDefinition.
+      ?pn oslc:prefix ?prefix.
+      ?pn oslc:prefixBase ?prefixBase.
+      filter( regex(str(?rt), str(?prefixBase))).
+      bind(substr(str(?rt), strlen(str(?prefixBase)) + 1) as ?rtName).
+
+      ?cap oslc:resourceShape/oslc:property ?pr.
+    	?pr oslc:name ?prName.
+    	?pr oslc:propertyDefinition ?prDef.
+    	?pr oslc:range ?prRange.
+    	?pr oslc:valueType ?prValueType.
+    }
+    order by ?prName
+  mapto
+    node(?prName).borderColor('none').color('none').parent(?rtName);
+  end
+end
+
+
+---------------
+group
+server
+    http://localhost:8080/openrdf-sesame/repositories/bugzilla
+  query
+    # list all resource types found in property ranges
+    # where ?range is ?prefix:?rangeName ?prefixBase
+    PREFIX oslc: <http://open-services.net/ns/core#>
+    select distinct ?range ?prefix ?rangeName
+    where {
+      ?sp a oslc:ServiceProvider.
+      ?sp oslc:service/(oslc:queryCapability|oslc:creationFactory) ?cap.
+      ?cap oslc:resourceShape/oslc:property/oslc:range ?range.
+      ?pn a oslc:PrefixDefinition.
+      ?pn oslc:prefix ?prefix.
+      ?pn oslc:prefixBase ?prefixBase.
+      filter( regex(str(?range), str(?prefixBase))).
+      bind(substr(str(?range), strlen(str(?prefixBase)) + 1) as ?rangeName).
+    }
+    order by ?rangeName
+  mapto
+    node('DomainSpecification').color('none').borderColor('none').label('').layout('hbox');
+    node(?prefix).tooltip('qwe').parent('DomainSpecification').color('lightgray');
+    node(?rangeName).parent(?prefix).color('#F3F393').cornerRadius(5);
+  end
+
+  server
+    http://localhost:8080/openrdf-sesame/repositories/bugzilla
+  query
+    # list all prefixes in prefix d
+    PREFIX oslc: <http://open-services.net/ns/core#>
+    select distinct ?prefix ?prefixBase
+    where {
+      ?pn a oslc:PrefixDefinition.
+      ?pn oslc:prefix ?prefix.
+      ?pn oslc:prefixBase ?prefixBase.
+     }
+    order by ?rtName
+  mapto
+    node('DomainSpecification').color('none').borderColor('none').label('').layout('hbox');
+    node(?prefix).tooltip('qwe').label(?prefix).parent('DomainSpecification').color('lightgray');
+    node(?rtName).color('white').parent(?prefix);
+  end
+
+  server
+    http://localhost:8080/openrdf-sesame/repositories/bugzilla
+  query
+    # list all properties by resource type
+    PREFIX oslc: <http://open-services.net/ns/core#>
+
+    select distinct ?rt ?prefix ?rtName ?pr ?prName ?prDef ?prValueType
+    where {
+      ?sp a oslc:ServiceProvider.
+      ?sp   oslc:service/(oslc:queryCapability|oslc:creationFactory) ?cap.
+      ?cap oslc:resourceType ?rt.
+
+      ?pn a oslc:PrefixDefinition.
+      ?pn oslc:prefix ?prefix.
+      ?pn oslc:prefixBase ?prefixBase.
+      filter( regex(str(?rt), str(?prefixBase))).
+      bind(substr(str(?rt), strlen(str(?prefixBase)) + 1) as ?rtName).
+
+      ?cap oslc:resourceShape/oslc:property ?pr.
+    	?pr oslc:name ?prName.
+    	?pr oslc:propertyDefinition ?prDef.
+        optional {?pr oslc:range ?prRange}.
+        filter(!bound(?prRange)).
+    	?pr oslc:valueType ?prValueType.
+    }
+    order by ?prName
+  mapto
+    node(?prName).label(?prName + ': ' + ?prValueType).borderColor('none').color('none').parent(?rtName);
+  end
+end
+---------------
+
+
+
+
+
+
+
+
+
+
+
+group
+server
+  https://fuseki.aide.md.kth.se/import-cpse/query
+query
+  select ?s ?p ?o
+  where {graph ?g {
+    ?s oslc_cm:changed_by ?o.
+  }}
+  limit 5
+mapto
+  node(?s).color('#fa8').parent(?o).cornerRadius(5);
+  node(?o).color('yellow').layout('vbox');
+  //line(?s, ?p, ?o);
+end
+
+server
+  https://fuseki.aide.md.kth.se/import-cpse/query
+query
+  select ?s ?q ?attr ?type
+  where {graph ?g {
+    ?s ?q ?attr.
+?o a ?type.
+  }}
+  limit 30
+mapto
+  console.log('type', ?s, ?type);
+  node(?s+?q).parent(?s).color('lightgreen').borderColor('none');
+end
+
+end
+
+server
+  https://fuseki.aide.md.kth.se/import-cpse/query
+query
+  select ?s ?p ?o
+  where {graph ?g {
+    ?s oslc_cm:changed_by ?o.
+  }}
+  limit 5
+mapto
+  node(?s).color('#fa8').parent(?o).cornerRadius(5);
+
+  node('hej').label('').parent(?s).layout('hbox');
+  node('du').parent('hej').color('none').borderColor('none').layout('hbox');
+  node('glade').parent('hej').color('lightgreen').layout('hbox');
+
+  node(?o).color('yellow').layout('vbox');
+  //line(?s, ?p, ?o);
+end
+end
+
+group
+server
+  http://localhost:8080/openrdf-sesame/repositories/scania
+query
+  select ?s ?p ?o ?stitle ?otitle
+  where {graph ?g {
+    ?s scania:hasSubComponent ?o.
+    ?s scania:title ?stitle.
+    ?o scania:title ?otitle.
+  }}
+  limit 50
+mapto
+  node(?s).color('#fa8').label(?stitle).layout('hbox');
+  node(?o).color('yellow').label(?otitle).parent(?s).layout('vbox');
+  //line(?s, ?p, ?o);
+end
+end
+server
+  https://fuseki.aide.md.kth.se/import-cpse/query
+query
+  select ?s ?block
+  where {graph ?g {
+    ?s a simulink:Model.
+  }}
+  limit 100
+mapto
+  node(?s)
+end
+
+
+server
+  http://localhost:8080/openrdf-sesame/repositories/scania
+query
+  select ?s ?t ?am
+  where {
+    ?s a <http://www.openlinksw.com/ontology/acl#AccessMode>.
+    ?s <http://www.w3.org/2000/01/rdf-schema#label> ?t.
+    ?s <http://www.openlinksw.com/ontology/acl#hasGrantAccessMode>
+                     /<http://www.w3.org/2000/01/rdf-schema#label> ?am.
+   }
+  limit 10
+mapto
+  node(?s).label(?t).color(
+    {'Grant Execute': 'yellow', 'Grant Sponge': '#5eF'}[?am]);
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+server
+  https://fuseki.aide.md.kth.se/import-cpse/query
+query
+  select (count(?a) as ?cnt) ?type
+    where {graph ?g {
+        ?a <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?type.
+        }
+    }
+    group by ?type
+    limit 10
+mapto
+  node(?type).label(?type, ?cnt);
+
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// show all objects of type ...#AccessMode
+query
+  select ?s
+  where {
+    ?s a <http://www.openlinksw.com/ontology/acl#AccessMode>.
+   }
+  limit 10
+mapto
+  node(?s)
+end
+
+query
+  select ?s ?t ?am
+  where {graph ?g {
+    ?s a <http://www.openlinksw.com/ontology/acl#AccessMode>.
+    ?s <http://www.w3.org/2000/01/rdf-schema#label> ?t.
+    ?s <http://www.openlinksw.com/ontology/acl#hasGrantAccessMode>/<http://www.w3.org/2000/01/rdf-schema#label> ?am.
+  }}
+  limit 10
+mapto
+  node(?s).label(?t).color({'Grant Execute': 'yellow', 'Grant Sponge': '#34E7FF'}[?am]);
+end
+
+// show all types
+query
+  select distinct ?o
+  where {
+    ?s a ?o.
+  }
+  limit 10
+mapto
+  node(?o)
+end
+
+query
+  select ?s ?p ?o
+  where {graph ?g {
+    ?s ?p ?o.
+  }}
+  limit 10
+mapto
+  node(?s).color('#34E7FF');
+  node(?o).color('yellow');
+  line(?s, ?p, ?o);
+end
+
+query
+  select ?s
+  where {graph ?g {
+    ?s a <http://www.openlinksw.com/ontology/acl#AccessMode>.
+  }}
+  limit 10
+mapto
+  node(?s);
+end

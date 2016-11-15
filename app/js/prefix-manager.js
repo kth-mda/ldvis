@@ -45,7 +45,6 @@ export function loadPrefixes(prefixes, url='prefixes') {
   return new Promise(function(fulfill, reject) {
     d3.json(url, function(json) {
       if (json) {
-        console.log(arguments);
         for (let key in json) {
           prefixes[key] = json[key];
         }

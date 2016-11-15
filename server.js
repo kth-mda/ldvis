@@ -67,17 +67,15 @@ app.get('/proxy', function (request, response) {
       url: request.query.url,
       headers: copyHeaders(request.headers, ['authorization', 'accept'])
     }, function (error, resp, body) {
-      // copy all headers from resp to response
-      for (var key in resp.headers) {
-        response.header(key, resp.headers[key]);
+      if (error) {
+        console.error(error);
+      } else {
+        // copy all headers from resp to response
+        for (var key in resp.headers) {
+          response.header(key, resp.headers[key]);
+        }
+        response.status(resp.statusCode).send(body);
       }
-      var correctedBody = body;
-      if (!error) {
-        //saveToCache(request.query.url, correctedBody);
-      }
-      response
-        .status(resp.statusCode)
-        .send(correctedBody);
     });
   }
 });
