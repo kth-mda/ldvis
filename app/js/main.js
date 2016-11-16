@@ -445,21 +445,40 @@ function PrefixHandler() {
     },
     // if iri has a known prefix, then return the prefix, else return the defaultValue parameter
     getPrefix: function(uri, defaultValue) {
-      let shrinked = parser.rdf.prefixes.shrink(uri.toString());
-      if (shrinked !== uri) {
-        return shrinked.substring(0, shrinked.indexOf(':'));
+      uri = peelUri(uri);
+      if (uri.indexOf('http:') === 0) {
+        let shrinked = parser.rdf.prefixes.shrink(uri.toString());
+        if (shrinked !== uri) {
+          return shrinked.substring(0, shrinked.indexOf(':'));
+        } else {
+          return defaultValue;
+        }
       } else {
-        return defaultValue;
+        let ci = uri.indexOf(':');
+        if (ci !== -1) {
+          return uri.substring(0, ci);
+        } else {
+          return uri;
+        }
       }
     },
     // if uri has a known prefix, then return uri with the prefix removed
     removePrefix: function(iri) {
       let uri = peelUri(iri);
-      let shrinked = parser.rdf.prefixes.shrink(uri.toString());
-      if (shrinked !== uri) {
-        return shrinked.substring(shrinked.indexOf(':') + 1);
+      if (uri.indexOf('http:') === 0) {
+        let shrinked = parser.rdf.prefixes.shrink(uri.toString());
+        if (shrinked !== uri) {
+          return shrinked.substring(shrinked.indexOf(':') + 1);
+        } else {
+          return uri;
+        }
       } else {
-        return uri;
+        let ci = uri.indexOf(':');
+        if (ci !== -1) {
+          return uri.substring(ci + 1);
+        } else {
+          return uri;
+        }
       }
     },
     shrink: function(uri) {
