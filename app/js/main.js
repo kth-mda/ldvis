@@ -40,6 +40,7 @@ function adjustUISize() {
 $(window).resize(adjustUISize);
 adjustUISize();
 
+// set adjustable splitter between spec editor and diagram
 Split(['#leftcol', '#rightcol'], {
   sizes: [50, 50],
   minSize: 200,
@@ -47,12 +48,13 @@ Split(['#leftcol', '#rightcol'], {
   snapOffset: 1
 });
 
-// init mapping spec field
+// init mapping spec field with saved mappingspec fetehced from rest service on server
 let mappingspec = d3.select('#mappingspec');
 d3.json('mappingspecs', function (data) {
   mappingspec.property('value', data[0].text);
 });
 
+// returns the selected text, or the whole text if none selected
 function getAllTextOrSelection() {
   let from = mappingspec.node().selectionStart;
   let to = mappingspec.node().selectionEnd;
@@ -62,23 +64,27 @@ function getAllTextOrSelection() {
   return mappingspec.property('value');
 }
 
+// handle keys
 d3.select('body').on('keyup', function () {
   if (d3.event.ctrlKey && d3.event.key === 'r') {
     // ctrl-r  - run spec
     runSpec(getAllTextOrSelection());
   } else {
-    // other key - save spec
-    debouncedSpecChanged();
+    // other key - save spec to server
+    debouncedSaveSpec();
   }
 });
 
+// handle run button
 d3.select('#runButton').on('click', function() {
+  // run spec
   runSpec(getAllTextOrSelection());
 });
 
-let debouncedSpecChanged = debounce(specChanged, 5000);
+let debouncedSaveSpec = debounce(saveSpec, 5000);
 
-function specChanged() {
+// save spec text to server
+function saveSpec() {
   console.log('saving mappingspec');
   var xhr = new XMLHttpRequest();
   xhr.onload = function () {
@@ -93,6 +99,7 @@ function specChanged() {
   }]));
 }
 
+// returns query with prefixes from parser.rdf.prefixes prepended
 function addPrefixes(query) {
   return getSparqlPrefixes(parser.rdf.prefixes) + '\n' + query;
 }
@@ -108,8 +115,8 @@ function getLineWord(s) {
 
 let prefixHandler = new PrefixHandler();
 
-// for each spec in text, calls specHandler(server, query, mapTo)
-function getSpecs(text, specHandler) {
+// separates each spec in text into server, query and mapTo and calls specHandler(server, query, mapTo)
+function parseSpecs(text, specHandler) {
   let isGroup = false;
   let n = 0;
   let word = getLineWord(text);
@@ -120,26 +127,48 @@ function getSpecs(text, specHandler) {
   let maxSpecs = 10;
   while (true) {
     text = text.substring(n);
-    if (getLineWord(text).trim() === 'end' || maxSpecs-- <= 0) {
+    if (text.trim() === '' || getLineWord(text).trim() === 'end' || maxSpecs-- <= 0) {
       break;
     }
-    let pattern = /\s+server([\s\S]*?)\n\s*query([\s\S]*?)mapto([\s\S]*?)end\b/m;
+    let pattern = /\s*server([\s\S]*?)\n\s*query([\s\S]*?)mapto([\s\S]*?)end\b/m;
     let match = pattern.exec(text);
     if (match) {
       let server = match[1];
       let query = match[2];
       let mapTo = match[3];
       specHandler(server, query, mapTo);
+      n = match[0].length;
+    } else {
+      console.error('spec does not match: server ... query ... mapto ... end');
+      break;
     }
-    n = match[0].length;
   }
 }
 
-// execute sparql query and map to diagram objects
+/* Executes spec by sending sparql query to server and map response to diagram objects.
+ Spec has the form:
+   server
+   query
+   mapto
+   end
+or
+   group
+     server
+     query
+     mapto
+     end
+
+     server
+     query
+     mapto
+     end
+
+      ...
+   end
+*/
 function runSpec(spec) {
-  let type = '0';
   diagramData = parser.rdf.createGraph();
-  getSpecs(spec, function(server, query, mapTo) {
+  parseSpecs(spec, function(server, query, mapTo) {
 //    query = addPrefixes(query);
     loadSparqlTsv(server, query).then(function (data) {
       if (data && data.length > 0) {
@@ -147,18 +176,22 @@ function runSpec(spec) {
         mapTo = mapTo.replace(/^\/\/.*?$/gm, '');
         // replace ?x in mapTo with obj['?x']
         _.forEach(Object.keys(data[0]), function(key) {
-          let pattern = '\\' + key + '\\b';
+          // fix result that uses keys without ? - dbpedia for example
+          let patternKey = key;
+          if (key[0] !== '?') {
+            patternKey = '?' + key;
+          }
+          let pattern = '\\' + patternKey + '\\b';
           mapTo = mapTo.replace(new RegExp(pattern, 'mg'), "obj['" + key + "']");
         });
-        mapDataToGraph(mapTo, data, type);
+        mapDataToGraph(mapTo, data);
       }
     });
-    type = (+type + 1).toString();
   });
 }
 
 // create graphical objects from data according to mapExpr
-function mapDataToGraph(mapExpr, data, type) {
+function mapDataToGraph(mapExpr, data) {
   // compile spec
   let compiledMapTo = compileCode(mapExpr);
 
@@ -199,7 +232,6 @@ function mapDataToGraph(mapExpr, data, type) {
           return chainObject;
         },
         tooltip: function(value) {
-          console.log('node tooltip', value);
           addTriple(diagramData, peelUri(id), OSLCKTH('tooltip'), peelUri(value));
           return chainObject;
         },
@@ -229,7 +261,7 @@ function mapDataToGraph(mapExpr, data, type) {
   renderAll();
 }
 
-// adds a new diagramobject of type with representing uri at document pos x, y
+// adds a new diagramobject represented by uri at document pos x, y
 function addDiagramObject(uri, x, y) {
   addTriple(diagramData, peelUri(uri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
   addTriple(diagramData, peelUri(uri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
@@ -258,7 +290,8 @@ let diagramData = parser.rdf.createGraph();
 
 // make id usable as a valid part of a d3.select expression, by replacing some chars by -
 function simplifyId(id) {
-    return id.replace(/[:/.]/g, '-');
+  console.log('simplifyId(',id,')');
+    return id.replace(/[:/.#]/g, '-');
 }
 
 let svgComponent = new SvgComponent('top').layout(new XyLayout()
@@ -268,7 +301,7 @@ let nodeComponent = new SimpleTextBoxComponent('obj')
   .dataId(d => simplifyId(d)).label(getNodeLabel).tooltip(d=>d)
   .backgroundColor(getNodeColor).foregroundColor(getNodeForegroundColor)
   .cornerRadius(getNodeCornerRadius);
-let relationComponent = new RelationComponent('relation').label(getRelationLabel).tooltip(d=>d.relationUri);
+let relationComponent = new RelationComponent('relation').dataId(d => simplifyId(d)).label(getRelationLabel).tooltip(d=>d.relationUri);
 
 
 
@@ -306,7 +339,6 @@ function getNodeForegroundColor(d) {
 
 function getTooltip(d) {
   let result = getOneObject(diagramData, d, OSLCKTH('tooltip'));
-  console.log('tooltip', result);
   return result ? result.toString() : d;
 }
 

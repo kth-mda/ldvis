@@ -1,0 +1,45 @@
+* I have an OSLC service - Bugzilla
+* import into openrdf graph store
+* write sparql to list all resource types with their prefixes according to OSLC prefix definitions - in openrdf workbench
+    # list all resource types found in service capability resourceType
+    # where ?range is ?prefix:?rangeName
+    PREFIX oslc: <http://open-services.net/ns/core#>
+    select distinct ?rt ?prefix ?rtName ?prefixBase
+    where {
+      ?sp a oslc:ServiceProvider.
+      ?sp   oslc:service/(oslc:queryCapability|oslc:creationFactory)
+          /oslc:resourceType ?rt.
+
+      ?pn a oslc:PrefixDefinition.
+      ?pn oslc:prefix ?prefix.
+      ?pn oslc:prefixBase ?prefixBase.
+      filter( regex(str(?rt), str(?prefixBase))).
+      bind(substr(str(?rt), strlen(str(?prefixBase)) + 1) as ?rtName).
+    }
+* move into Linked Data Visualizer - LDVis - add mapping skeleton
+  server
+    http://localhost:8080/openrdf-sesame/repositories/bugzilla
+  query
+  end
+* add Domain Specification node
+    node('DomainSpecification');
+* add domain node
+    node(?prefix).parent('DomainSpecification');
+* discuss how the same node can be created repeatedly if the id is the same
+* set domain spec horizontal layout
+  .layout('hbox')
+* hide domain spec node label - note function chaining
+  .label('')
+* set domain node color
+  .color('lightgray')
+* add resource types per domain
+  node(?rtName).parent(?prefix).color('white');
+* add the same for properties - with group-end bracket
+  <from domainspec.txt>
+* describe prefix handling and the prefixes object
+* add prefixes indexing
+  <from domainspec.txt>
+* add properties mapping
+* describe property range handling
+* add lines
+* simplify by handling with and without range with if ()

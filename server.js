@@ -15,6 +15,91 @@ app.use(webpackDevMiddleware(webpack(config), {}));
 
 app.use(bodyParser.json());
 
+app.get('/list', function(request, response) {
+  // returns a JSON list of metadata for all saved diagrams
+  fs.readdir('specs', (err, files) => {
+    if (err) {
+      if (err.code && err.code === 'ENOENT') {
+        response.status(404).send(err.message);
+      } else {
+        response.status(500).send(err.message);
+      }
+    } else {
+      response.send(files.map(fileName => fileName.substring(0, fileName.length - 5)));
+    }
+  });
+});
+
+app.all('/:id/spec', function(request, response) {
+  var id = request.params.id;
+  var getPath = () => 'specs/' + id + '.spec';
+  if (request.method === 'GET') {
+    fs.readFile(getPath(), (err, data) => {
+      if (err) {
+        if (err.code && err.code === 'ENOENT') {
+          response.status(404).send(err.message);
+        } else {
+          response.status(500).send(err.message);
+        }
+      } else {
+        response.type('text/plain');
+        response.send(data);
+      }
+    });
+  } else if (request.method === 'PUT') {
+    fs.writeFile(getPath(), request.body.specText, (err) => {
+      if (err) {
+        if (err.code && err.code === 'ENOENT') {
+          response.status(404).send(err.message);
+        } else {
+          response.status(500).send(err.message);
+        }
+      } else {
+        response.status(204).end();
+      }
+    });
+  } else if (request.method === 'DELETE') {
+    fs.unlink(getPath(), function(err) {
+      if (err) {
+        if (err.code && err.code === 'ENOENT') {
+          response.status(404).send(err.message);
+        } else {
+          response.status(500).send(err.message);
+        }
+      }
+      response.status(204).end();
+    });
+  } else {
+    response.status(405).send('Method Not Allowed');
+  }
+});
+
+app.post('/', function(request, response) {
+  // generate a random 5 char alphanumeric string
+  function getRandomId() {return (Math.random() + 1).toString(36).substring(7, 12)}
+
+  function createNew(maxTries) {
+    var newId = getRandomId();
+    fs.writeFile('specs/' + newId + '.spec', request.body.specText, {flag: 'wx'}, (err) => {
+      if (err) {
+        if (err.code && err.code === 'EEXIST') {
+          if (maxTries <= 0) {
+            response.status(500).send('cannot find a unique spec file name');
+          } else {
+            createNew(maxTries - 1);
+          }
+        } else {
+          response.status(500).send(err.message);
+        }
+      } else {
+        response.send(newId);
+      }
+    });
+  }
+
+  createNew(100);
+});
+
 // respond with specifications json
 app.get('/mappingspecs', function(request, response) {
   console.log('GET /mappingspecs');
@@ -80,6 +165,8 @@ app.get('/proxy', function (request, response) {
   }
 });
 
+app.use('/', express.static(path.resolve('./app')));
+
 // returns an object containing non-empty headers
 // in headerNameList copied from srcHeaders
 function copyHeaders(srcHeaders, headerNameList) {
@@ -93,7 +180,6 @@ function copyHeaders(srcHeaders, headerNameList) {
   return toHeaders;
 }
 
-app.use('/', express.static(path.resolve('./app')));
 app.listen(port, function () {
   console.log('listening at localhost:' + port);
 });
