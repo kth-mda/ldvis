@@ -79,7 +79,7 @@ table tr.selected td {
   background-color: #aaa;
 }
 
-#ui {
+#editor {
   display: flex;
   flex-direction: column;
 }

@@ -15,6 +15,9 @@ app.use(webpackDevMiddleware(webpack(config), {}));
 
 app.use(bodyParser.json());
 
+app.use('/run/:id', express.static(path.resolve('./app')));
+
+// respond with diagram id list json
 app.get('/list', function(request, response) {
   // returns a JSON list of metadata for all saved diagrams
   fs.readdir('specs', (err, files) => {
@@ -30,10 +33,12 @@ app.get('/list', function(request, response) {
   });
 });
 
+// diagram file read/update/delete
 app.all('/:id/spec', function(request, response) {
-  var id = request.params.id;
+  var id = request.params.id; // get diagram id from URL
   var getPath = () => 'specs/' + id + '.spec';
-  if (request.method === 'GET') {
+
+  if (request.method === 'GET') { // respond with diagram file -----------------------------
     fs.readFile(getPath(), (err, data) => {
       if (err) {
         if (err.code && err.code === 'ENOENT') {
@@ -46,7 +51,7 @@ app.all('/:id/spec', function(request, response) {
         response.send(data);
       }
     });
-  } else if (request.method === 'PUT') {
+  } else if (request.method === 'PUT') { // replace diagram file contents with post data ---
     fs.writeFile(getPath(), request.body.specText, (err) => {
       if (err) {
         if (err.code && err.code === 'ENOENT') {
@@ -58,7 +63,7 @@ app.all('/:id/spec', function(request, response) {
         response.status(204).end();
       }
     });
-  } else if (request.method === 'DELETE') {
+  } else if (request.method === 'DELETE') { // delete diagram file -------------------------
     fs.unlink(getPath(), function(err) {
       if (err) {
         if (err.code && err.code === 'ENOENT') {
@@ -69,11 +74,12 @@ app.all('/:id/spec', function(request, response) {
       }
       response.status(204).end();
     });
-  } else {
+  } else { // ------------------------------------------------------------------------------
     response.status(405).send('Method Not Allowed');
   }
 });
 
+// create a new diagram with a random id, and respond with the id
 app.post('/', function(request, response) {
   // generate a random 5 char alphanumeric string
   function getRandomId() {return (Math.random() + 1).toString(36).substring(7, 12)}
@@ -82,7 +88,7 @@ app.post('/', function(request, response) {
     var newId = getRandomId();
     fs.writeFile('specs/' + newId + '.spec', request.body.specText, {flag: 'wx'}, (err) => {
       if (err) {
-        if (err.code && err.code === 'EEXIST') {
+        if (err.code && err.code === 'EEXIST') { // generated filename already exists - try another id
           if (maxTries <= 0) {
             response.status(500).send('cannot find a unique spec file name');
           } else {
@@ -97,7 +103,7 @@ app.post('/', function(request, response) {
     });
   }
 
-  createNew(100);
+  createNew(100); // create a new diagram file - try at most 100 random names, to get an unused one
 });
 
 // respond with specifications json

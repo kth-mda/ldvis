@@ -33,6 +33,15 @@ let contextMenu = d3ctx(d3);
 // loadPrefixes(parser.rdf.prefixes).then(function() {
 // });
 
+// for all immediate children of element cardsId having class 'card', display only the element with id cardId
+function showCard(cardsId, cardId) {
+  d3.selectAll('#' + cardsId + ' > .card').each(function(d) {
+    this.style.display = (this.id === cardId ? 'block' : 'none');
+  })
+}
+
+showCard('ui', 'listCard');
+
 // handle page layout
 function adjustUISize() {
   $('#ui').height($(window).innerHeight());

@@ -1,21 +1,42 @@
 <!DOCTYPE html>
 <html>
   <head>
+    <base href="/">
     <meta charset="utf-8">
     <title>Linked Data Visualizer</title>
     <link rel="stylesheet" type="text/css" href="main.css">
   </head>
   <body>
     <div id="ui">
-      <div id="toprow">
+      <div id="listCard" class="card">
+        <table>
+          <tr>
+            <td>diagram 1</td>
+          </tr>
+          <tr>
+            <td>diagram 2</td>
+          </tr>
+          <tr>
+            <td>diagram 3</td>
+          </tr>
+        </table>
       </div>
-      <div id="cols">
-        <div id="leftcol">
-          <div id="toolbar"><button id="runButton">Run</button></div>
-          <textarea id="mappingspec" spellcheck="false"></textarea>
-        </div>
-        <div id="rightcol">
-          <div id="graph"></div>
+      <div id="diagramCard" class="card">
+        <div id="diagramGraph"></div>
+      </div>
+      <div id="editorCard" class="card">
+        <div id="editor">
+          <div id="toprow">
+          </div>
+          <div id="cols">
+            <div id="leftcol">
+              <div id="toolbar"><button id="runButton">Run</button></div>
+              <textarea id="mappingspec" spellcheck="false"></textarea>
+            </div>
+            <div id="rightcol">
+              <div id="graph"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
