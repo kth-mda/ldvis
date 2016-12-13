@@ -411,10 +411,13 @@ let manipulator = new Manipulator()
   .add(new SelectTool());
 
 function renderAll() {
-  var parent = '#rightcol';
+  var parent = '#diagramGraph';
+  if (document.location.pathname.split('/')[3] === 'edit') {
+    parent = '#rightcol';
+  }
   let svg = svgComponent(d3.select(parent));
   hierarchyComponent(svg, diagramData);
-  svgComponent.layout()(d3.select('#rightcol svg'));
+  svgComponent.layout()(d3.select(parent + ' svg'));
   let rels = getRelations();
   let relsEls = relationComponent(svg, rels);
   relsEls.each(function (d) {
@@ -422,7 +425,7 @@ function renderAll() {
   });
   separateOverlappingRelations(relsEls);
 
-  d3.selectAll('#rightcol .obj')
+  d3.selectAll(parent + ' .obj')
     .call(manipulator);
 }
 
@@ -531,10 +534,13 @@ function PrefixHandler() {
 
 // returns an object if URL matches /diagram[/id], with the id attribute set only if id is present
 function decodeLocation() {
-  var match = /\/diagram(\/\w+\/?)?/.exec(document.location.pathname);
-  if (match) {
-    if (match[1]) {
-      return {id: match[1].replace(/\//g, '')};
+  var parts = document.location.pathname.split('/');
+  var isDiagram = parts[1] === 'diagram';
+  var id = parts[2];
+  var isEdit = parts[3] === 'edit';
+  if (isDiagram) {
+    if (id) {
+      return {id: id, edit: isEdit};
     } else {
       return {};
     }
@@ -545,14 +551,21 @@ function decodeLocation() {
 
 function showAccordingToUrl() {
   var decodedLocation = decodeLocation();
+  console.log('decodedLocation', decodedLocation);
   if (decodedLocation) {
     if (decodedLocation.id) {
       // get spec by id and set editor to it
       getJson('/diagram/' + decodedLocation.id, function (data) {
         console.log('data', data);
         mappingspec.property('value', data.spec);
-        showCard('ui', 'editorCard');
-        renderAll();
+        if (decodedLocation.edit) {
+          showCard('ui', 'editorCard');
+          renderAll();
+        } else {
+          showCard('ui', 'diagramCard');
+          document.title = decodedLocation.id + ' - LDVis';
+          runSpec(data.spec);
+        }
       });
     } else {
       // no id - show diagram list

@@ -15,6 +15,19 @@ app.use(webpackDevMiddleware(webpack(config), {}));
 
 app.use(bodyParser.json());
 
+app.use('/diagram/:id/edit', function(request, response, next) {
+  if (request.method === 'GET') {
+    if (acceptsWithParam('html', request) === 'html') {
+      // return diagram web page
+      console.log('return diagram web page');
+      addAntiCacheHeaders(response);
+      return express.static(path.resolve('./app'))(request, response, next);
+    }
+  } else {
+    return next();
+  }
+});
+
 // diagram file read/update/delete
 app.use('/diagram/:id', function(request, response, next) {
   console.log("app.use('/diagram/:id', ...");
