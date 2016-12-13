@@ -15,44 +15,43 @@ app.use(webpackDevMiddleware(webpack(config), {}));
 
 app.use(bodyParser.json());
 
-app.use('/run/:id', express.static(path.resolve('./app')));
-
-// respond with diagram id list json
-app.get('/list', function(request, response) {
-  // returns a JSON list of metadata for all saved diagrams
-  fs.readdir('specs', (err, files) => {
-    if (err) {
-      if (err.code && err.code === 'ENOENT') {
-        response.status(404).send(err.message);
-      } else {
-        response.status(500).send(err.message);
-      }
-    } else {
-      response.send(files.map(fileName => fileName.substring(0, fileName.length - 5)));
-    }
-  });
-});
-
 // diagram file read/update/delete
-app.all('/:id/spec', function(request, response) {
+app.use('/diagram/:id', function(request, response, next) {
+  console.log("app.use('/diagram/:id', ...");
   var id = request.params.id; // get diagram id from URL
   var getPath = () => 'specs/' + id + '.spec';
 
-  if (request.method === 'GET') { // respond with diagram file -----------------------------
-    fs.readFile(getPath(), (err, data) => {
-      if (err) {
-        if (err.code && err.code === 'ENOENT') {
-          response.status(404).send(err.message);
+  if (request.method === 'GET') {
+    if (acceptsWithParam('html', request) === 'html') {
+      // return diagram web page
+      console.log('return diagram web page');
+      addAntiCacheHeaders(response);
+      return express.static(path.resolve('./app'))(request, response, next);
+    } else if (acceptsWithParam('png', request) === 'png') {
+      // return diagram png image
+      console.log('return diagram png image');
+      response.status(404).end('png image not supported yet');
+    } else if (acceptsWithParam('json', request) === 'json') {
+      // return diagram metadata
+      console.log('return diagram metadata');
+      fs.readFile(getPath(), (err, data) => {
+        if (err) {
+          if (err.code && err.code === 'ENOENT') {
+            response.status(404).send(err.message);
+          } else {
+            response.status(500).send(err.message);
+          }
         } else {
-          response.status(500).send(err.message);
+          console.log('data', data.toString());
+          response.type('text/plain');
+          response.send({spec: data.toString()});
         }
-      } else {
-        response.type('text/plain');
-        response.send(data);
-      }
-    });
-  } else if (request.method === 'PUT') { // replace diagram file contents with post data ---
-    fs.writeFile(getPath(), request.body.specText, (err) => {
+      });
+    }
+  } else if (request.method === 'PUT') {
+    // replace diagram file contents with post data
+    console.log('saving', request.body);
+    fs.writeFile(getPath(), request.body.spec, (err) => {
       if (err) {
         if (err.code && err.code === 'ENOENT') {
           response.status(404).send(err.message);
@@ -63,7 +62,8 @@ app.all('/:id/spec', function(request, response) {
         response.status(204).end();
       }
     });
-  } else if (request.method === 'DELETE') { // delete diagram file -------------------------
+  } else if (request.method === 'DELETE') {
+    // delete diagram file
     fs.unlink(getPath(), function(err) {
       if (err) {
         if (err.code && err.code === 'ENOENT') {
@@ -74,14 +74,15 @@ app.all('/:id/spec', function(request, response) {
       }
       response.status(204).end();
     });
-  } else { // ------------------------------------------------------------------------------
+  } else {
     response.status(405).send('Method Not Allowed');
   }
 });
 
 // create a new diagram with a random id, and respond with the id
-app.post('/', function(request, response) {
+app.post('/diagram', function(request, response) {
   // generate a random 5 char alphanumeric string
+  console.log("app.post('/diagram', ...");
   function getRandomId() {return (Math.random() + 1).toString(36).substring(7, 12)}
 
   function createNew(maxTries) {
@@ -98,6 +99,7 @@ app.post('/', function(request, response) {
           response.status(500).send(err.message);
         }
       } else {
+        response.type('text/plain');
         response.send(newId);
       }
     });
@@ -105,6 +107,35 @@ app.post('/', function(request, response) {
 
   createNew(100); // create a new diagram file - try at most 100 random names, to get an unused one
 });
+
+
+app.use('/diagram', function(request, response, next) {
+  console.log("app.use('/diagram', ...");
+  console.log('accept:', request.get('accept'));
+  if (acceptsWithParam('html', request) === 'html') {
+    // return diagram list page
+    console.log('return diagram list page');
+    addAntiCacheHeaders(response);
+    return express.static(path.resolve('./app'))(request, response, next);
+  } else if (acceptsWithParam('json', request) === 'json') {
+    // return json list of all saved diagrams
+    console.log('return json list of all saved diagrams');
+    fs.readdir('specs', (err, files) => {
+      if (err) {
+        if (err.code && err.code === 'ENOENT') {
+          response.status(404).send(err.message);
+        } else {
+          response.status(500).send(err.message);
+        }
+      } else {
+        response.send(files.map(fileName => fileName.substring(0, fileName.length - 5)));
+      }
+    });
+  }
+});
+
+
+
 
 // respond with specifications json
 app.get('/mappingspecs', function(request, response) {
@@ -147,9 +178,7 @@ app.post('/prefixes', function(request, response) {
 app.get('/proxy', function (request, response) {
   console.log('get /proxy');
   response.header('Access-Control-Allow-Origin', '*');
-  response.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-  response.header('Pragma', 'no-cache');
-  response.header('Expires', '0');
+  addAntiCacheHeaders(response);
   if (useCache) {
     response.header('Content-Type', 'application/xml');
     response.send(getFromCache(request.query.url));
@@ -171,7 +200,10 @@ app.get('/proxy', function (request, response) {
   }
 });
 
-app.use('/', express.static(path.resolve('./app')));
+app.use('/', function(request, response, next) {
+  addAntiCacheHeaders(response);
+  return express.static(path.resolve('./app'))(request, response, next);
+});
 
 // returns an object containing non-empty headers
 // in headerNameList copied from srcHeaders
@@ -200,4 +232,25 @@ function saveToCache(url, result) {
 }
 function getFromCache(url) {
   return fs.readFileSync(path.join(cacheFolder, encodeURIComponent(url)) + '.xml', 'utf8');
+}
+
+// sets response headers to prevent caching of pages
+function addAntiCacheHeaders(response) {
+  response.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+  response.header('Pragma', 'no-cache');
+  response.header('Expires', '0');
+}
+
+// check if type is accepted by the request sender
+// to simplify debugging, the query parameter accept=html, json or png etc can be used to simulate Accept header
+function acceptsWithParam(type, request) {
+  var acceptQParam = request.query.accept;
+  console.log('query.accept:', acceptQParam);
+  if (acceptQParam) {
+    if (acceptQParam === type || (type.indexOf && type.indexOf(acceptQParam) !== -1)) {
+      return type;
+    }
+  } else {
+    return request.accepts(type);
+  }
 }

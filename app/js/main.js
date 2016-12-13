@@ -30,6 +30,9 @@ var parser = new RdfXmlParser();
 
 let contextMenu = d3ctx(d3);
 
+let mappingspec = d3.select('#mappingspec');
+
+
 // loadPrefixes(parser.rdf.prefixes).then(function() {
 // });
 
@@ -40,7 +43,7 @@ function showCard(cardsId, cardId) {
   })
 }
 
-showCard('ui', 'listCard');
+showCard('ui', 'editorCard');
 
 // handle page layout
 function adjustUISize() {
@@ -55,12 +58,6 @@ Split(['#leftcol', '#rightcol'], {
   minSize: 200,
   gutterSize: 5,
   snapOffset: 1
-});
-
-// init mapping spec field with saved mappingspec fetehced from rest service on server
-let mappingspec = d3.select('#mappingspec');
-d3.json('mappingspecs', function (data) {
-  mappingspec.property('value', data[0].text);
 });
 
 // returns the selected text, or the whole text if none selected
@@ -80,7 +77,7 @@ d3.select('body').on('keyup', function () {
     runSpec(getAllTextOrSelection());
   } else {
     // other key - save spec to server
-    debouncedSaveSpec();
+    //debouncedSaveSpec();
   }
 });
 
@@ -90,22 +87,27 @@ d3.select('#runButton').on('click', function() {
   runSpec(getAllTextOrSelection());
 });
 
+d3.select('#saveButton').on('click', function() {
+  // run spec
+  saveSpec();
+});
+
 let debouncedSaveSpec = debounce(saveSpec, 5000);
 
-// save spec text to server
 function saveSpec() {
-  console.log('saving mappingspec');
-  var xhr = new XMLHttpRequest();
-  xhr.onload = function () {
-    if (xhr.onReady != undefined) {
-      console.log(this.responseText);
-    }
-  };
-  xhr.open("post", 'mappingspecs', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.send(JSON.stringify([{
-    text: mappingspec.property('value')
-  }]));
+  var decodedLocation = decodeLocation();
+  if (decodedLocation && decodedLocation.id) {
+    console.log('saving mappingspec');
+    var xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      if (xhr.onReady != undefined) {
+        console.log(this.responseText);
+      }
+    };
+    xhr.open("put", 'diagram/' + decodedLocation.id, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send(JSON.stringify({spec: mappingspec.property('value')}));
+  }
 }
 
 // returns query with prefixes from parser.rdf.prefixes prepended
@@ -299,8 +301,7 @@ let diagramData = parser.rdf.createGraph();
 
 // make id usable as a valid part of a d3.select expression, by replacing some chars by -
 function simplifyId(id) {
-  console.log('simplifyId(',id,')');
-    return id.replace(/[:/.#]/g, '-');
+  return id.replace(/[:/.#]/g, '-');
 }
 
 let svgComponent = new SvgComponent('top').layout(new XyLayout()
@@ -410,7 +411,8 @@ let manipulator = new Manipulator()
   .add(new SelectTool());
 
 function renderAll() {
-  let svg = svgComponent(d3.select('#rightcol'));
+  var parent = '#rightcol';
+  let svg = svgComponent(d3.select(parent));
   hierarchyComponent(svg, diagramData);
   svgComponent.layout()(d3.select('#rightcol svg'));
   let rels = getRelations();
@@ -423,7 +425,6 @@ function renderAll() {
   d3.selectAll('#rightcol .obj')
     .call(manipulator);
 }
-renderAll();
 
 function peelUri(uri) {
   return (uri.length > 2 && uri[0] === '<') ? uri.substring(1, uri.length - 1) : uri;
@@ -526,4 +527,60 @@ function PrefixHandler() {
       return shrinkResultUri(uri);
     }
   }
+}
+
+// returns an object if URL matches /diagram[/id], with the id attribute set only if id is present
+function decodeLocation() {
+  var match = /\/diagram(\/\w+\/?)?/.exec(document.location.pathname);
+  if (match) {
+    if (match[1]) {
+      return {id: match[1].replace(/\//g, '')};
+    } else {
+      return {};
+    }
+  } else {
+    return null;
+  }
+}
+
+function showAccordingToUrl() {
+  var decodedLocation = decodeLocation();
+  if (decodedLocation) {
+    if (decodedLocation.id) {
+      // get spec by id and set editor to it
+      getJson('/diagram/' + decodedLocation.id, function (data) {
+        console.log('data', data);
+        mappingspec.property('value', data.spec);
+        showCard('ui', 'editorCard');
+        renderAll();
+      });
+    } else {
+      // no id - show diagram list
+      showCard('ui', 'listCard');
+      renderList();
+    }
+  }
+}
+showAccordingToUrl();
+
+onpopstate = function() {
+  showAccordingToUrl();
+}
+
+function renderList() {
+  getJson('/diagram', function(diagrams) {
+    var tr = d3.select('#listCard table').selectAll('tr').data(diagrams, d => d);
+    tr.enter().append('tr').append('td').text(d => d).on('click', function(d) {
+        window.history.pushState(d, 'Diagram ' + d, '/diagram/' + d);
+        showAccordingToUrl();
+    });
+    tr.exit().remove();
+  });
+}
+
+function getJson(url, f) {
+  d3.request(url)
+  .header("Accept", "application/json")
+  .response(function(xhr) { return JSON.parse(xhr.responseText); })
+  .get(f);
 }

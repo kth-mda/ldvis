@@ -71,8 +71,13 @@ table {
   background-color: #ddd;
 }
 
+table tr {
+  height: 2em;
+}
+
 table tr td {
   background-color: #eee;
+  padding-left: 0.5em;
 }
 
 table tr.selected td {

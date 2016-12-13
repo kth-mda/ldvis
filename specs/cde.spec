@@ -10,5 +10,5 @@ query
     ?pn oslc:prefixBase ?prefixBase.
   }
 mapto
-  prefixes.add(?prefix, ?prefixBase);
+  prefixes.add(?prefix, ?prefixBase);;
 end

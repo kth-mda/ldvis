@@ -1,14 +1,11 @@
 server
-  http://localhost:8080/openrdf-sesame/repositories/bugzilla
+    http://dbpedia.org/sparql
 query
-  # list all oslc:PrefixDefinition
-  PREFIX oslc: <http://open-services.net/ns/core#>
-  select distinct ?prefix ?prefixBase
-  where {
-    ?pn a oslc:PrefixDefinition.
-    ?pn oslc:prefix ?prefix.
-    ?pn oslc:prefixBase ?prefixBase.
-  }
+    select ?s ?p ?o
+    where {
+      ?s ?p ?o.
+    }
+    limit 5
 mapto
-  prefixes.add(?prefix, ?prefixBase);
+    node(?s);
 end
