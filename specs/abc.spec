@@ -1,11 +1,4 @@
-server
-    http://dbpedia.org/sparql
-query
-    select ?s ?p ?o
-    where {
-      ?s ?p ?o.
-    }
-    limit 5
-mapto
-    node(?s);
-end
+{
+  "title": "First five wikipedia subjects",
+  "spec": "server\n    http://dbpedia.org/sparql\nquery\n    select ?s ?p ?o\n    where {\n      ?s ?p ?o.\n    }\n    limit 5\nmapto\n    node(?s); \nend\n"
+}

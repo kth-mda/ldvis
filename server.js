@@ -15,17 +15,15 @@ app.use(webpackDevMiddleware(webpack(config), {}));
 
 app.use(bodyParser.json());
 
+// return web application page
 app.use('/diagram/:id/edit', function(request, response, next) {
   if (request.method === 'GET') {
     if (acceptsWithParam('html', request) === 'html') {
-      // return diagram web page
-      console.log('return diagram web page');
       addAntiCacheHeaders(response);
       return express.static(path.resolve('./app'))(request, response, next);
     }
-  } else {
-    return next();
   }
+  return next();
 });
 
 // diagram file read/update/delete
@@ -56,15 +54,15 @@ app.use('/diagram/:id', function(request, response, next) {
           }
         } else {
           console.log('data', data.toString());
-          response.type('text/plain');
-          response.send({spec: data.toString()});
+          response.type('application/json');
+          response.send(data.toString());
         }
       });
     }
   } else if (request.method === 'PUT') {
     // replace diagram file contents with post data
     console.log('saving', request.body);
-    fs.writeFile(getPath(), request.body.spec, (err) => {
+    fs.writeFile(getPath(), JSON.stringify(request.body, null, '  '), (err) => {
       if (err) {
         if (err.code && err.code === 'ENOENT') {
           response.status(404).send(err.message);
@@ -141,7 +139,18 @@ app.use('/diagram', function(request, response, next) {
           response.status(500).send(err.message);
         }
       } else {
-        response.send(files.map(fileName => fileName.substring(0, fileName.length - 5)));
+        Promise.all(files.map(filename => new Promise(function(fulfill, fail) {
+          fs.readFile('specs/' + filename, function(err, data) {
+            if (err) {
+              fail(err);
+            } else {
+              var fileContent = JSON.parse(data);
+              fulfill({id: filename.substring(0, filename.length - 5), title: fileContent.title});
+            }
+          })
+        }))).then(function(list) {
+          response.send(list);
+        });
       }
     });
   }
@@ -149,25 +158,6 @@ app.use('/diagram', function(request, response, next) {
 
 
 
-
-// respond with specifications json
-app.get('/mappingspecs', function(request, response) {
-  console.log('GET /mappingspecs');
-  try {
-    var text = fs.readFileSync('mappingspecs.json');
-    var textJson = JSON.parse(text);
-    response.send(text);
-  } catch (e) {
-    response.send(500, 'no valid mappingspecs.json found');
-  }
-});
-
-// save posted mapingsspecs json object
-app.post('/mappingspecs', function(request, response) {
-  console.log('POST /mappingspecs');
-  fs.writeFileSync('mappingspecs.json', JSON.stringify(request.body, null, '  '));
-  response.sendStatus(200);
-});
 
 // respond with prefixes json
 app.get('/prefixes', function(request, response) {

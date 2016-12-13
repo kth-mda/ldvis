@@ -31,6 +31,7 @@ var parser = new RdfXmlParser();
 let contextMenu = d3ctx(d3);
 
 let mappingspec = d3.select('#mappingspec');
+let titleInput = d3.select('#titleInput');
 
 
 // loadPrefixes(parser.rdf.prefixes).then(function() {
@@ -77,7 +78,7 @@ d3.select('body').on('keyup', function () {
     runSpec(getAllTextOrSelection());
   } else {
     // other key - save spec to server
-    //debouncedSaveSpec();
+    debouncedSaveSpec();
   }
 });
 
@@ -87,12 +88,7 @@ d3.select('#runButton').on('click', function() {
   runSpec(getAllTextOrSelection());
 });
 
-d3.select('#saveButton').on('click', function() {
-  // run spec
-  saveSpec();
-});
-
-let debouncedSaveSpec = debounce(saveSpec, 5000);
+let debouncedSaveSpec = debounce(saveSpec, 3000);
 
 function saveSpec() {
   var decodedLocation = decodeLocation();
@@ -106,7 +102,7 @@ function saveSpec() {
     };
     xhr.open("put", 'diagram/' + decodedLocation.id, true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.send(JSON.stringify({spec: mappingspec.property('value')}));
+    xhr.send(JSON.stringify({title: titleInput.property('value'), spec: mappingspec.property('value')}));
   }
 }
 
@@ -551,19 +547,18 @@ function decodeLocation() {
 
 function showAccordingToUrl() {
   var decodedLocation = decodeLocation();
-  console.log('decodedLocation', decodedLocation);
   if (decodedLocation) {
     if (decodedLocation.id) {
       // get spec by id and set editor to it
       getJson('/diagram/' + decodedLocation.id, function (data) {
-        console.log('data', data);
         mappingspec.property('value', data.spec);
+        titleInput.property('value', data.title);
         if (decodedLocation.edit) {
           showCard('ui', 'editorCard');
           renderAll();
         } else {
           showCard('ui', 'diagramCard');
-          document.title = decodedLocation.id + ' - LDVis';
+          document.title = data.title + ' - LDVis';
           runSpec(data.spec);
         }
       });
@@ -582,9 +577,9 @@ onpopstate = function() {
 
 function renderList() {
   getJson('/diagram', function(diagrams) {
-    var tr = d3.select('#listCard table').selectAll('tr').data(diagrams, d => d);
-    tr.enter().append('tr').append('td').text(d => d).on('click', function(d) {
-        window.history.pushState(d, 'Diagram ' + d, '/diagram/' + d);
+    var tr = d3.select('#listCard table').selectAll('tr').data(diagrams, d => d.id);
+    tr.enter().append('tr').append('td').text(d => d.title).on('click', function(d) {
+        window.history.pushState(d.id, d.title, '/diagram/' + d.id);
         showAccordingToUrl();
     });
     tr.exit().remove();

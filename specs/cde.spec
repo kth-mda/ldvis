@@ -1,14 +1,4 @@
-server
-  http://localhost:8080/openrdf-sesame/repositories/bugzilla
-query
-  # list all oslc:PrefixDefinition
-  PREFIX oslc: <http://open-services.net/ns/core#>
-  select distinct ?prefix ?prefixBase
-  where {
-    ?pn a oslc:PrefixDefinition.
-    ?pn oslc:prefix ?prefix.
-    ?pn oslc:prefixBase ?prefixBase.
-  }
-mapto
-  prefixes.add(?prefix, ?prefixBase);;
-end
+{
+  "title": "Domain specification diagram",
+  "spec": "group\n  server\n    http://localhost:8080/openrdf-sesame/repositories/bugzilla\n  query\n    # list all oslc:PrefixDefinition\n    PREFIX oslc: <http://open-services.net/ns/core#>\n    select distinct ?prefix ?prefixBase\n    where {\n      ?pn a oslc:PrefixDefinition.\n      ?pn oslc:prefix ?prefix.\n      ?pn oslc:prefixBase ?prefixBase.\n    }\n  mapto\n    prefixes.add(?prefix, ?prefixBase);\n  end\n\n  server\n    http://localhost:8080/openrdf-sesame/repositories/bugzilla\n  query\n    # list all resource types found in property ranges\n    # where ?range is ?prefix:?rangeName ?prefixBase\n    PREFIX oslc: <http://open-services.net/ns/core#>\n    select distinct ?range ?prefix ?rangeName\n    where {\n      ?sp a oslc:ServiceProvider.\n      ?sp oslc:service/(oslc:queryCapability|oslc:creationFactory) ?cap.\n      ?cap oslc:resourceShape/oslc:property/oslc:range ?range.\n\n      ?pn a oslc:PrefixDefinition.\n      ?pn oslc:prefix ?prefix.\n      ?pn oslc:prefixBase ?prefixBase.\n      filter( regex(str(?range), str(?prefixBase))).\n      bind(substr(str(?range), strlen(str(?prefixBase)) + 1) as ?rangeName).\n    }\n    order by ?rangeName\n  mapto\n    node('DomainSpecification').color('none').borderColor('none').label('').layout('hbox');\n    node(?prefix).parent('DomainSpecification').color('lightgray');\n    node(?rangeName).parent(?prefix).color('#F3F393').cornerRadius(5);\n  end\n\n  server\n    http://localhost:8080/openrdf-sesame/repositories/bugzilla\n  query\n        # list all resource types found in service capability resourceType\n    # where ?range is ?prefix:?rangeName\n    PREFIX oslc: <http://open-services.net/ns/core#>\n    select distinct ?rt ?prefix ?rtName ?prefixBase\n    where {\n      ?sp a oslc:ServiceProvider.\n      ?sp   oslc:service/(oslc:queryCapability|oslc:creationFactory)\n          /oslc:resourceType ?rt.\n\n      ?pn a oslc:PrefixDefinition.\n      ?pn oslc:prefix ?prefix.\n      ?pn oslc:prefixBase ?prefixBase.\n      filter( regex(str(?rt), str(?prefixBase))).\n      bind(substr(str(?rt), strlen(str(?prefixBase)) + 1) as ?rtName).\n    }\n  mapto\n    node('DomainSpecification').label('');\n    node(?prefix).parent('DomainSpecification').color('lightgray');\n    node(?rtName).parent(?prefix).color('white');\n  end\n\n  server\n    http://localhost:8080/openrdf-sesame/repositories/bugzilla\n  query\n    # list all properties by resource type\n    PREFIX oslc: <http://open-services.net/ns/core#>\n\n    select distinct ?rt ?prefix ?pr ?prName ?prDef ?prRange ?prValueType\n    where {\n      ?sp a oslc:ServiceProvider.\n      ?sp   oslc:service/(oslc:queryCapability|oslc:creationFactory) ?cap.\n      ?cap oslc:resourceType ?rt.\n\n      ?cap oslc:resourceShape/oslc:property ?pr.\n      ?pr oslc:name ?prName.\n      ?pr oslc:propertyDefinition ?prDef.\n      optional {?pr oslc:range ?prRange}.\n      ?pr oslc:valueType ?prValueType.\n    }\n    order by ?prName\n  mapto\n    if (?prRange) {\n       line(prefixes.removePrefix(?rt), prefixes.shrink(?prDef), prefixes.removePrefix(?prRange));\n    } else {\n      node(?prName).label(prefixes.shrink(?prDef) + ': ' + prefixes.shrink(?prValueType))\n        .borderColor('none').color('none').parent(prefixes.removePrefix(?rt));\n    }\n  end\nend\n"
+}
