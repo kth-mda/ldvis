@@ -131,7 +131,7 @@ app.use('/diagram', function(request, response, next) {
   } else if (acceptsWithParam('json', request) === 'json') {
     // return json list of all saved diagrams
     console.log('return json list of all saved diagrams');
-    fs.readdir('specs', (err, files) => {
+    fs.readdir('specs', (err, filenames) => {
       if (err) {
         if (err.code && err.code === 'ENOENT') {
           response.status(404).send(err.message);
@@ -139,17 +139,35 @@ app.use('/diagram', function(request, response, next) {
           response.status(500).send(err.message);
         }
       } else {
-        Promise.all(files.map(filename => new Promise(function(fulfill, fail) {
+        // read all files in order to get their title, and add object containing name and title to array
+        Promise.all(filenames.map(filename => new Promise(function(fulfill, fail) {
           fs.readFile('specs/' + filename, function(err, data) {
             if (err) {
+              console.error('read file err', err);
               fail(err);
             } else {
               var fileContent = JSON.parse(data);
-              fulfill({id: filename.substring(0, filename.length - 5), title: fileContent.title});
+              fulfill({id: filename.substring(0, filename.length - 5), filename: filename, title: fileContent.title});
             }
           })
-        }))).then(function(list) {
-          response.send(list);
+        })))
+        .then(function(fileInfoList) {
+          // read file change date and add to info
+          return Promise.all(fileInfoList.map(fileInfo => new Promise(function(fulfill, fail) {
+            fs.stat('specs/' + fileInfo.filename, function(err, stats) {
+              if (err) {
+                console.error('stat err', err);
+                fail(err);
+              } else {
+                fileInfo.mtime = stats.mtime.getTime();
+                fulfill(fileInfo);
+              }
+            })
+          })));
+        })
+        .then(function(fileInfoList) {
+          console.log('fileInfoList', fileInfoList);
+          response.send(fileInfoList);
         });
       }
     });

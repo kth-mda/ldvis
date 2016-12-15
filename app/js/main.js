@@ -564,6 +564,7 @@ function showAccordingToUrl() {
       });
     } else {
       // no id - show diagram list
+      console.log('show list');
       showCard('ui', 'listCard');
       document.title = 'Diagram List - LDVis';
       renderList();
@@ -573,12 +574,15 @@ function showAccordingToUrl() {
 showAccordingToUrl();
 
 onpopstate = function() {
+  console.log('popstate');
   showAccordingToUrl();
 }
 
 function renderList() {
   getJson('/diagram', function(diagrams) {
-    let tr = d3.select('#listCard table').selectAll('tr').data(diagrams, d => d.id);
+    console.log('diagrams', diagrams);
+    let mtimeComparator = (a, b) => a.mtime - b.mtime;
+    let tr = d3.select('#listCard table').selectAll('tr').data(diagrams.sort(mtimeComparator), d => d.id);
     let trEnter = tr.enter().append('tr');
     let trEnterTd = trEnter.append('td');
     trEnterTd.append('span').text(d => d.title).on('click', function(d) {
