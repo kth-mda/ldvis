@@ -291,7 +291,7 @@ function addDiagramRelationObject(subjectUri, relationUri, objectUri) {
 }
 
 // handle diagram
-let OSLCKTH = suffix => 'http://oslc.kth.se/ldexplorer#' + suffix;
+function OSLCKTH(suffix) {return 'http://oslc.kth.se/ldexplorer#' + suffix;}
 
 let diagramData = parser.rdf.createGraph();
 
@@ -565,6 +565,7 @@ function showAccordingToUrl() {
     } else {
       // no id - show diagram list
       showCard('ui', 'listCard');
+      document.title = 'Diagram List - LDVis';
       renderList();
     }
   }
@@ -577,18 +578,47 @@ onpopstate = function() {
 
 function renderList() {
   getJson('/diagram', function(diagrams) {
-    var tr = d3.select('#listCard table').selectAll('tr').data(diagrams, d => d.id);
-    tr.enter().append('tr').append('td').text(d => d.title).on('click', function(d) {
+    let tr = d3.select('#listCard table').selectAll('tr').data(diagrams, d => d.id);
+    let trEnter = tr.enter().append('tr');
+    let trEnterTd = trEnter.append('td');
+    trEnterTd.append('span').text(d => d.title).on('click', function(d) {
         window.history.pushState(d.id, d.title, '/diagram/' + d.id);
         showAccordingToUrl();
     });
+    trEnterTd.append('button').text('Edit').on('click', function(d) {
+      window.history.pushState(d.id, '', '/diagram/' + d.id + '/edit');
+      showAccordingToUrl();
+    });
+    trEnterTd.append('button').text('Delete').on('click', function(d) {
+      d3.request('/diagram/' + d.id)
+      .on('error', function(err) { console.error(err); })
+      .on('load', function(err) { showAccordingToUrl(); })
+      .send('delete');
+    });
     tr.exit().remove();
+  });
+
+  d3.select('#addDiagramButton').on('click', function(d) {
+    postJson('/diagram', function(newDiagramMetadata) {
+      console.log('newDiagramMetadata.id', newDiagramMetadata.id);
+      window.history.pushState(newDiagramMetadata.id, '', '/diagram/' + newDiagramMetadata.id + '/edit');
+      showAccordingToUrl();
+    });
   });
 }
 
 function getJson(url, f) {
   d3.request(url)
   .header("Accept", "application/json")
+  .header('Content-Type', 'application/json')
   .response(function(xhr) { return JSON.parse(xhr.responseText); })
   .get(f);
+}
+
+function postJson(url, f) {
+  d3.request(url)
+  .header("Accept", "application/json")
+  .response(function(xhr) { return JSON.parse(xhr.responseText); })
+  .header('Content-Type', 'application/json')
+  .send('post', JSON.stringify({title: 'New Diagram', spec: 'server\n    http://dbpedia.org/sparql\nquery\n    select ?s ?p ?o\n    where {\n      ?s ?p ?o.\n    }\n    limit 5\nmapto\n    node(?s); \nend\n'}), f);
 }

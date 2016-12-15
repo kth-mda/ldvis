@@ -17,6 +17,10 @@ input {
   margin: 0px 8px 0px 0px;
 }
 
+.button-bar {
+  margin: .5em;
+}
+
 #toolbar {
   display: flex;
   flex-direction: row;

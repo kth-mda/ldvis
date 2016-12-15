@@ -95,10 +95,10 @@ app.post('/diagram', function(request, response) {
   // generate a random 5 char alphanumeric string
   console.log("app.post('/diagram', ...");
   function getRandomId() {return (Math.random() + 1).toString(36).substring(7, 12)}
-
+console.log('request.body', request.body);
   function createNew(maxTries) {
     var newId = getRandomId();
-    fs.writeFile('specs/' + newId + '.spec', request.body.specText, {flag: 'wx'}, (err) => {
+    fs.writeFile('specs/' + newId + '.spec', JSON.stringify(request.body), {flag: 'wx'}, (err) => {
       if (err) {
         if (err.code && err.code === 'EEXIST') { // generated filename already exists - try another id
           if (maxTries <= 0) {
@@ -110,8 +110,8 @@ app.post('/diagram', function(request, response) {
           response.status(500).send(err.message);
         }
       } else {
-        response.type('text/plain');
-        response.send(newId);
+        response.type('application/json');
+        response.send({id: newId});
       }
     });
   }
