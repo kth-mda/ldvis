@@ -3,8 +3,6 @@ require('jquery-ui/themes/base/menu.css');
 // require('jquery-ui/themes/base/dialog.css');
 require('jquery-ui/themes/base/theme.css');
 import $ from 'jquery';
-let draggable = require('jquery-ui/ui/widgets/draggable');
-draggable();
 
 import Split from 'split.js';
 import RdfXmlParser from 'rdf-parser-rdfxml';
@@ -24,14 +22,12 @@ import {
 import debounce from 'debounce';
 import {compileCode} from './compilecode';
 
-let initialServerUrl = 'https://git.md.kth.se/fuseki/import-cpse/query';
-
 var parser = new RdfXmlParser();
 
 let contextMenu = d3ctx(d3);
 
-let mappingspec = d3.select('#mappingspec');
 let titleInput = d3.select('#titleInput');
+let mappingspec = d3.select('#mappingspec');
 
 
 // loadPrefixes(parser.rdf.prefixes).then(function() {
@@ -71,7 +67,7 @@ function getAllTextOrSelection() {
   return mappingspec.property('value');
 }
 
-// handle keys
+// handle keyboard events
 d3.select('body').on('keyup', function () {
   if (d3.event.ctrlKey && d3.event.key === 'r') {
     // ctrl-r  - run spec
@@ -123,7 +119,7 @@ function getLineWord(s) {
 let prefixHandler = new PrefixHandler();
 
 // separates each spec in text into server, query and mapTo and calls specHandler(server, query, mapTo)
-function parseSpecs(text, specHandler) {
+function parseSpec(text, specHandler) {
   let isGroup = false;
   let n = 0;
   let word = getLineWord(text);
@@ -175,7 +171,7 @@ or
 */
 function runSpec(spec) {
   diagramData = parser.rdf.createGraph();
-  parseSpecs(spec, function(server, query, mapTo) {
+  parseSpec(spec, function(server, query, mapTo) {
 //    query = addPrefixes(query);
     loadSparqlTsv(server, query).then(function (data) {
       if (data && data.length > 0) {
@@ -545,6 +541,10 @@ function decodeLocation() {
   }
 }
 
+// document.location.pathname:
+// /diagram - show list and update it from server
+// /diagram/<id> - read diagram info from server, run and show diagram
+// /diagram/<id>/edit - read diagram info from server, open editor without running diagram
 function showAccordingToUrl() {
   var decodedLocation = decodeLocation();
   if (decodedLocation) {
