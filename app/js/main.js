@@ -120,6 +120,7 @@ let prefixHandler = new PrefixHandler();
 
 // separates each spec in text into server, query and mapTo and calls specHandler(server, query, mapTo)
 function parseSpec(text, specHandler) {
+  let parsedSpecs = [];
   let isGroup = false;
   let n = 0;
   let word = getLineWord(text);
@@ -136,47 +137,35 @@ function parseSpec(text, specHandler) {
     let pattern = /\s*server([\s\S]*?)\n\s*query([\s\S]*?)mapto([\s\S]*?)end\b/m;
     let match = pattern.exec(text);
     if (match) {
-      let server = match[1];
-      let query = match[2];
-      let mapTo = match[3];
-      specHandler(server, query, mapTo);
+      parsedSpecs.push({server: match[1], query: match[2], mapTo: match[3]});
       n = match[0].length;
     } else {
       console.error('spec does not match: server ... query ... mapto ... end');
       break;
     }
   }
+  return parsedSpecs;
 }
 
 /* Executes spec by sending sparql query to server and map response to diagram objects.
- Spec has the form:
+ Spec has one or more:
    server
+     <sparql server url>
    query
+    <sparql select query>
    mapto
-   end
-or
-   group
-     server
-     query
-     mapto
-     end
-
-     server
-     query
-     mapto
-     end
-
-      ...
+     <calls to node, line and functions on their results>
    end
 */
 function runSpec(spec) {
-  diagramData = parser.rdf.createGraph();
-  parseSpec(spec, function(server, query, mapTo) {
-//    query = addPrefixes(query);
-    loadSparqlTsv(server, query).then(function (data) {
+  // diagramData = parser.rdf.createGraph();
+  let parsedSpecs = parseSpec(spec);
+  Promise.all(_.map(parsedSpecs, function(parsedSpec) {
+    // return promises that have created nodes and lines in dd
+    return loadSparqlTsv(parsedSpec.server, parsedSpec.query).then(function (data) {
       if (data && data.length > 0) {
         // remove comments
-        mapTo = mapTo.replace(/^\/\/.*?$/gm, '');
+        parsedSpec.mapTo = parsedSpec.mapTo.replace(/^\/\/.*?$/gm, '');
         // replace ?x in mapTo with obj['?x']
         _.forEach(Object.keys(data[0]), function(key) {
           // fix result that uses keys without ? - dbpedia for example
@@ -185,11 +174,37 @@ function runSpec(spec) {
             patternKey = '?' + key;
           }
           let pattern = '\\' + patternKey + '\\b';
-          mapTo = mapTo.replace(new RegExp(pattern, 'mg'), "obj['" + key + "']");
+          parsedSpec.mapTo = parsedSpec.mapTo.replace(new RegExp(pattern, 'mg'), "obj['" + key + "']");
         });
-        mapDataToGraph(mapTo, data);
+        mapDataToGraph(parsedSpec.mapTo, data);
       }
     });
+  })).then(function() {
+
+    // add each node to the children array of its parent
+    // and collect all top level nodes in array dd.topNodes
+    dd.topNodes = [];
+    for (let nodeId in dd.nodes) {
+      let node = dd.nodes[nodeId];
+      if (node.parent) {
+        let parentNode = dd.nodes[node.parent];
+        if (parentNode) {
+          if (parentNode.children) {
+            parentNode.children.push(node);
+          } else {
+            parentNode.children = [node];
+          }
+        } else {
+          console.error('missing parent', node.parent, 'of node', node.id);
+        }
+      } else {
+        dd.topNodes.push(node);
+      }
+    }
+
+    d3.select('svg').selectAll('.node').remove();
+    hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
+    renderAll(dd.topNodes);
   });
 }
 
@@ -198,59 +213,83 @@ function mapDataToGraph(mapExpr, data) {
   // compile spec
   let compiledMapTo = compileCode(mapExpr);
 
+console.log('mapExpr', mapExpr);
   // run mapExpr to get
   // - a configured graphical component
   // - a function to run for each data item
   _.forEach(data, function(obj, i) {
     function node(id) {
-      addDiagramObject(id, 10, 10 + i * 40);
+      let no = dd.nodes[id];
+      if (!no) {
+        no = {id: id, x: 10, y: 10 + i * 40};
+        dd.nodes[id] = no;
+      }
       let chainObject = {
         label: function(...lines) {
           let nlSeparated = _.map(lines, shrinkResultUri).join('\n')
-          addTriple(diagramData, peelUri(id), OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          no.label = nlSeparated;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         },
         cornerRadius: function(radius) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('cornerRadius'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+          no.cornerRadius = radius;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('cornerRadius'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
           return chainObject;
         },
-        padding: function(radius) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('padding'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+        padding: function(paddingSize) {
+          no.padding = paddingSize;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('padding'), parser.rdf.createLiteral(paddingSize.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
           return chainObject;
         },
-        margin: function(radius) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('margin'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+        margin: function(marginSize) {
+          no.margin = marginSize;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('margin'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
           return chainObject;
         },
         color: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('color'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          no.color = value;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('color'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         },
         borderColor: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('borderColor'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          no.borderColor = value;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('borderColor'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         },
         parent: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('parent'), peelUri(value));
+          no.parent = value;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('parent'), peelUri(value));
           return chainObject;
         },
         tooltip: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('tooltip'), peelUri(value));
+          no.tooltip = value;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('tooltip'), peelUri(value));
           return chainObject;
         },
         layout: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('layout'), peelUri(value));
+          no.layout = value;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('layout'), peelUri(value));
           return chainObject;
         }
       };
       return chainObject;
     }
+    function lineId(s, p, o) {
+      return s + '#' + p + '#' + o;
+    }
     function line(s, p, o) {
-      let relationUri = addDiagramRelationObject(s, p, o, 10, 10 + i * 40);
+      let id = lineId(s, p, o);
+      let li = dd.lines[id];
+      if (!li) {
+        li = {id: id, from: s, relationUri: p, to: o};
+        dd.lines[id] = li;
+      }
+      // let relationUri = addDiagramRelationObject(s, p, o, 10, 10 + i * 40);
       let chainObject = {
         label: function(...lines) {
           let nlSeparated = _.map(lines, shrinkResultUri).join('\n')
-          addTriple(diagramData, relationUri, OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          li.label = nlSeparated;
+          // addTriple(diagramData, relationUri, OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         }
       };
@@ -259,134 +298,150 @@ function mapDataToGraph(mapExpr, data) {
     let mapToResult = compiledMapTo({node, line, obj, i, console, prefixes: prefixHandler});
   });
 
-  d3.select('svg').selectAll('.node').remove();
-  hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
-  renderAll();
+console.log('dd', dd);
+
 }
 
-// adds a new diagramobject represented by uri at document pos x, y
-function addDiagramObject(uri, x, y) {
-  addTriple(diagramData, peelUri(uri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-  addTriple(diagramData, peelUri(uri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-  addTriple(diagramData, peelUri(uri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-
-  return uri;
-}
-
-function addDiagramRelationObject(subjectUri, relationUri, objectUri) {
-  let relationSubject = parser.rdf.createBlankNode();
-  addTriple(diagramData, relationSubject, RDF('type'), OSLCKTH('relation'));
-  addTriple(diagramData, relationSubject, OSLCKTH('from'), peelUri(subjectUri));
-  addTriple(diagramData, relationSubject, OSLCKTH('relationUri'), peelUri(relationUri));
-  addTriple(diagramData, relationSubject, OSLCKTH('to'), peelUri(objectUri));
-
-  addTriple(diagramData, peelUri(subjectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-  addTriple(diagramData, peelUri(objectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-
-  return relationSubject;
-}
+// // adds a new diagramobject represented by uri at document pos x, y
+// function addDiagramObject(uri, x, y) {
+//   addTriple(diagramData, peelUri(uri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
+//   addTriple(diagramData, peelUri(uri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+//   addTriple(diagramData, peelUri(uri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+//
+//   return uri;
+// }
+//
+// function addDiagramRelationObject(subjectUri, relationUri, objectUri) {
+//   let relationSubject = parser.rdf.createBlankNode();
+//   addTriple(diagramData, relationSubject, RDF('type'), OSLCKTH('relation'));
+//   addTriple(diagramData, relationSubject, OSLCKTH('from'), peelUri(subjectUri));
+//   addTriple(diagramData, relationSubject, OSLCKTH('relationUri'), peelUri(relationUri));
+//   addTriple(diagramData, relationSubject, OSLCKTH('to'), peelUri(objectUri));
+//
+//   addTriple(diagramData, peelUri(subjectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
+//   addTriple(diagramData, peelUri(objectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
+//
+//   return relationSubject;
+// }
 
 // handle diagram
 function OSLCKTH(suffix) {return 'http://oslc.kth.se/ldexplorer#' + suffix;}
 
-let diagramData = parser.rdf.createGraph();
+let dd = {nodes: {}, lines: {}, topNodes: []};
 
 // make id usable as a valid part of a d3.select expression, by replacing some chars by -
 function simplifyId(id) {
   return id.replace(/[:/.#]/g, '-');
 }
 
-let svgComponent = new SvgComponent('top').layout(new XyLayout()
-  .dataX(d => +getOneObjectString(diagramData, d, OSLCKTH('posx')))
-  .dataY(d => +getOneObjectString(diagramData, d, OSLCKTH('posy'))));
+let svgComponent = new SvgComponent('top').layout(new XyLayout());
 let nodeComponent = new SimpleTextBoxComponent('obj')
-  .dataId(d => simplifyId(d)).label(getNodeLabel).tooltip(d=>d)
-  .backgroundColor(getNodeColor).foregroundColor(getNodeForegroundColor)
-  .cornerRadius(getNodeCornerRadius);
-let relationComponent = new RelationComponent('relation').dataId(d => simplifyId(d)).label(getRelationLabel).tooltip(d=>d.relationUri);
-
-
+  .dataId(d => simplifyId(d.id)).label(d => [d.label || d.id])
+  .tooltip(d => d.id)
+  .backgroundColor(d => d.color).foregroundColor(d => d.borderColor)
+  .cornerRadius(d => d.cornerRadius);
+let relationComponent = new RelationComponent('relation').dataId(d => simplifyId(d)).label(getRelationLabel).tooltip(getTooltip);
 
 let nodeComponentByLayout = {
-  'xy': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-    .dataId(d => simplifyId(d)).layout(new XyLayout()).minSize({width: 10, height: 10}),
-  'hbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-    .dataId(d => simplifyId(d)).layout(new HBoxLayout()).minSize({width: 10, height: 10}),
-  'vbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-    .dataId(d => simplifyId(d)).layout(new VBoxLayout()).minSize({width: 10, height: 10})
+  'xy': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
+    .dataId(d => simplifyId(d.id)).layout(new XyLayout()).minSize({width: 10, height: 10}),
+  'hbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
+    .dataId(d => simplifyId(d.id)).layout(new HBoxLayout()).minSize({width: 10, height: 10}),
+  'vbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
+    .dataId(d => simplifyId(d.id)).layout(new VBoxLayout()).minSize({width: 10, height: 10})
 };
 for (let c in nodeComponentByLayout) {
   nodeComponentByLayout[c].componentLayoutName = c;
 }
 
 function getNodeLabel(d) {
-  let result = getOneObject(diagramData, d, OSLCKTH('label'));
-  return result ? result.toString().split('\n') : [parser.rdf.prefixes.shrink(d)];
+  let result = d.label;
+  return result ? result.split('\n') : [parser.rdf.prefixes.shrink(d.id)];
 }
-
+//
 function getRelationLabel(d) {
-  let result = getOneObject(diagramData, d.id, OSLCKTH('label'));
-  return result ? result.toString().split('\n') : [parser.rdf.prefixes.shrink(d.relationUri)];
+  let result = d.label;
+  return result ? result.split('\n') : [parser.rdf.prefixes.shrink(d.relationUri)];
 }
 
 function getNodeColor(d) {
-  let result = getOneObject(diagramData, d, OSLCKTH('color'));
+  let result = d.color;
   return result ? result.toString() : 'white';
 }
 
 function getNodeForegroundColor(d) {
-  let result = getOneObject(diagramData, d, OSLCKTH('borderColor'));
+  let result = d.borderColor;
   return result ? result.toString() : 'black';
 }
 
 function getTooltip(d) {
-  let result = getOneObject(diagramData, d, OSLCKTH('tooltip'));
-  return result ? result.toString() : d;
+  let result = d.toolTip;
+  return result ? result.toString() : d.id;
 }
 
 function getNodeCornerRadius(d) {
-  let result = getOneObject(diagramData, d, OSLCKTH('cornerRadius'));
+  let result = d.cornerRadius;
   return result ? +result.toString() : 0;
 }
 
+// function getChildren(parent, data) {
+//   let parentLessSubject = triple => data.match(triple.subject, OSLCKTH('parent'), null).length == 0;
+//   if (parent) {
+//     let children = data.match(null, OSLCKTH('parent'), parent).toArray();
+//     return _.map(children, d => d.subject.toString());
+//   } else {
+//     let visibleObjects = data.match(null, OSLCKTH('visible'), null)
+//       .filter(parentLessSubject).toArray();
+//     return _.map(visibleObjects, d => d.subject.toString());
+//   }
+// }
+
+// data is a map of nodes by id
 function getChildren(parent, data) {
-  let parentLessSubject = triple => data.match(triple.subject, OSLCKTH('parent'), null).length == 0;
+  // console.log('getChildren(', parent, ', ',data,')');
   if (parent) {
-    let children = data.match(null, OSLCKTH('parent'), parent).toArray();
-    return _.map(children, d => d.subject.toString());
+    return parent.children;
   } else {
-    let visibleObjects = data.match(null, OSLCKTH('visible'), null)
-      .filter(parentLessSubject).toArray();
-    return _.map(visibleObjects, d => d.subject.toString());
+    return dd.topNodes;
   }
 }
 
 function getComponent(d) {
-  let layoutName = getOneObjectString(diagramData, d, OSLCKTH('layout'));
-  let nodeComponentResult = nodeComponentByLayout[layoutName];
+  let nodeComponentResult = nodeComponentByLayout[d.layout];
   let component = nodeComponentResult || nodeComponent;
   return component;
 }
 
+// function getRelations() {
+//   let relations = [];
+//   let visibleObjects = diagramData.filter(t => t.predicate.toString() === OSLCKTH('visible'));
+//   matchForEachTriple(diagramData, null, RDF('type'), OSLCKTH('relation'), function (relationTypeTriple) {
+//     let from = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('from'))
+//     let relationUri = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('relationUri'))
+//     let to = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('to'))
+//     if (visibleObjects.some(t => t.subject.toString() === from.toString()) &&
+//       visibleObjects.some(t => t.subject.toString() === to.toString())) {
+//       // both subject and object of this relation is visible in diagram
+//       relations.push({
+//         id: relationTypeTriple.subject,
+//         from: from.toString(),
+//         to: to.toString(),
+//         relationUri: relationUri.toString()
+//       })
+//     }
+//   });
+//   return relations;
+// }
+
 function getRelations() {
-  let relations = [];
-  let visibleObjects = diagramData.filter(t => t.predicate.toString() === OSLCKTH('visible'));
-  matchForEachTriple(diagramData, null, RDF('type'), OSLCKTH('relation'), function (relationTypeTriple) {
-    let from = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('from'))
-    let relationUri = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('relationUri'))
-    let to = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('to'))
-    if (visibleObjects.some(t => t.subject.toString() === from.toString()) &&
-      visibleObjects.some(t => t.subject.toString() === to.toString())) {
-      // both subject and object of this relation is visible in diagram
-      relations.push({
-        id: relationTypeTriple.subject,
-        from: from.toString(),
-        to: to.toString(),
-        relationUri: relationUri.toString()
-      })
-    }
+  return _.map(dd.lines, function(relation) {
+    return {
+      id: relation.id,
+      from: relation.from,
+      relationUri: relation.relationUri,
+      to: relation.to
+    };
   });
-  return relations;
 }
 
 let hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
@@ -408,8 +463,9 @@ function renderAll() {
     parent = '#rightcol';
   }
   let svg = svgComponent(d3.select(parent));
-  hierarchyComponent(svg, diagramData);
+  hierarchyComponent(svg, dd);
   svgComponent.layout()(d3.select(parent + ' svg'));
+
   let rels = getRelations();
   let relsEls = relationComponent(svg, rels);
   relsEls.each(function (d) {
@@ -417,8 +473,8 @@ function renderAll() {
   });
   separateOverlappingRelations(relsEls);
 
-  d3.selectAll(parent + ' .obj')
-    .call(manipulator);
+  // d3.selectAll(parent + ' .obj')
+  //   .call(manipulator);
 }
 
 function peelUri(uri) {
