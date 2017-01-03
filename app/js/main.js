@@ -118,35 +118,6 @@ function getLineWord(s) {
 
 let prefixHandler = new PrefixHandler();
 
-// separates each spec in text into server, query and mapTo and calls specHandler(server, query, mapTo)
-function parseSpec(text, specHandler) {
-  let parsedSpecs = [];
-  let isGroup = false;
-  let n = 0;
-  let word = getLineWord(text);
-  if (word.trim() === 'group') {
-    isGroup = true;
-    n += word.length;
-  }
-  let maxSpecs = 10;
-  while (true) {
-    text = text.substring(n);
-    if (text.trim() === '' || getLineWord(text).trim() === 'end' || maxSpecs-- <= 0) {
-      break;
-    }
-    let pattern = /\s*server([\s\S]*?)\n\s*query([\s\S]*?)mapto([\s\S]*?)end\b/m;
-    let match = pattern.exec(text);
-    if (match) {
-      parsedSpecs.push({server: match[1], query: match[2], mapTo: match[3]});
-      n = match[0].length;
-    } else {
-      console.error('spec does not match: server ... query ... mapto ... end');
-      break;
-    }
-  }
-  return parsedSpecs;
-}
-
 /* Executes spec by sending sparql query to server and map response to diagram objects.
  Spec has one or more:
    server
@@ -159,6 +130,7 @@ function parseSpec(text, specHandler) {
 */
 function runSpec(spec) {
   // diagramData = parser.rdf.createGraph();
+  dd = {nodes: {}, lines: {}, topNodes: []};
   let parsedSpecs = parseSpec(spec);
   Promise.all(_.map(parsedSpecs, function(parsedSpec) {
     // return promises that have created nodes and lines in dd
@@ -180,32 +152,59 @@ function runSpec(spec) {
       }
     });
   })).then(function() {
+    prepareNodeTree();
 
-    // add each node to the children array of its parent
-    // and collect all top level nodes in array dd.topNodes
-    dd.topNodes = [];
-    for (let nodeId in dd.nodes) {
-      let node = dd.nodes[nodeId];
-      if (node.parent) {
-        let parentNode = dd.nodes[node.parent];
-        if (parentNode) {
-          if (parentNode.children) {
-            parentNode.children.push(node);
-          } else {
-            parentNode.children = [node];
-          }
-        } else {
-          console.error('missing parent', node.parent, 'of node', node.id);
-        }
-      } else {
-        dd.topNodes.push(node);
-      }
-    }
-
-    d3.select('svg').selectAll('.node').remove();
     hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
     renderAll(dd.topNodes);
   });
+}
+
+// add each node to the children array of its parent
+// and collect all top level nodes in array dd.topNodes
+function prepareNodeTree() {
+  dd.topNodes = [];
+  for (let nodeId in dd.nodes) {
+    let node = dd.nodes[nodeId];
+    if (node.parent) {
+      let parentNode = dd.nodes[node.parent];
+      if (parentNode) {
+        // node has an existing parent node
+        if (parentNode.children) {
+          parentNode.children.push(node);
+        } else {
+          parentNode.children = [node];
+        }
+      } else {
+        console.error('missing parent', node.parent, 'of node', node.id);
+      }
+    } else {
+      // node has no parent - its a top node
+      dd.topNodes.push(node);
+    }
+  }
+}
+
+// separates each spec in text into {server, query and mapTo} returns array of them
+function parseSpec(text) {
+  let parsedSpecs = [];
+  let n = 0;
+  let maxSpecs = 20;
+  while (true) {
+    text = text.substring(n);
+    if (text.trim() === '' || maxSpecs-- <= 0) {
+      break;
+    }
+    let pattern = /\s*server([\s\S]*?)\n\s*query([\s\S]*?)mapto([\s\S]*?)end\b/m;
+    let match = pattern.exec(text);
+    if (match) {
+      parsedSpecs.push({server: match[1], query: match[2], mapTo: match[3]});
+      n = match[0].length;
+    } else {
+      console.error('spec does not match: server ... query ... mapto ... end');
+      break;
+    }
+  }
+  return parsedSpecs;
 }
 
 // create graphical objects from data according to mapExpr
@@ -213,7 +212,6 @@ function mapDataToGraph(mapExpr, data) {
   // compile spec
   let compiledMapTo = compileCode(mapExpr);
 
-console.log('mapExpr', mapExpr);
   // run mapExpr to get
   // - a configured graphical component
   // - a function to run for each data item
@@ -297,32 +295,7 @@ console.log('mapExpr', mapExpr);
     }
     let mapToResult = compiledMapTo({node, line, obj, i, console, prefixes: prefixHandler});
   });
-
-console.log('dd', dd);
-
 }
-
-// // adds a new diagramobject represented by uri at document pos x, y
-// function addDiagramObject(uri, x, y) {
-//   addTriple(diagramData, peelUri(uri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-//   addTriple(diagramData, peelUri(uri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-//   addTriple(diagramData, peelUri(uri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-//
-//   return uri;
-// }
-//
-// function addDiagramRelationObject(subjectUri, relationUri, objectUri) {
-//   let relationSubject = parser.rdf.createBlankNode();
-//   addTriple(diagramData, relationSubject, RDF('type'), OSLCKTH('relation'));
-//   addTriple(diagramData, relationSubject, OSLCKTH('from'), peelUri(subjectUri));
-//   addTriple(diagramData, relationSubject, OSLCKTH('relationUri'), peelUri(relationUri));
-//   addTriple(diagramData, relationSubject, OSLCKTH('to'), peelUri(objectUri));
-//
-//   addTriple(diagramData, peelUri(subjectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-//   addTriple(diagramData, peelUri(objectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-//
-//   return relationSubject;
-// }
 
 // handle diagram
 function OSLCKTH(suffix) {return 'http://oslc.kth.se/ldexplorer#' + suffix;}
@@ -331,7 +304,7 @@ let dd = {nodes: {}, lines: {}, topNodes: []};
 
 // make id usable as a valid part of a d3.select expression, by replacing some chars by -
 function simplifyId(id) {
-  return id.replace(/[:/.#]/g, '-');
+  return id.replace(/[:/.#<>]/g, '-');
 }
 
 let svgComponent = new SvgComponent('top').layout(new XyLayout());

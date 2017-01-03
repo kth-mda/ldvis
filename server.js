@@ -53,7 +53,6 @@ app.use('/diagram/:id', function(request, response, next) {
             response.status(500).send(err.message);
           }
         } else {
-          console.log('data', data.toString());
           response.type('application/json');
           response.send(data.toString());
         }
@@ -61,7 +60,6 @@ app.use('/diagram/:id', function(request, response, next) {
     }
   } else if (request.method === 'PUT') {
     // replace diagram file contents with post data
-    console.log('saving', request.body);
     fs.writeFile(getPath(), JSON.stringify(request.body, null, '  '), (err) => {
       if (err) {
         if (err.code && err.code === 'ENOENT') {
