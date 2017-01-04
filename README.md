@@ -5,7 +5,13 @@
 
 
 - [The mapping specification](#the-mapping-specification)
-  - [A simple example](#a-simple-example)
+  - [server](#server)
+  - [query](#query)
+  - [mapto](#mapto)
+    - [Nodes](#nodes)
+    - [Lines](#lines)
+    - [Nested nodes](#nested-nodes)
+    - [Layout](#layout)
 - [Set up development environment](#set-up-development-environment)
   - [Prerequisites](#prerequisites)
   - [Checkout, build and run](#checkout-build-and-run)

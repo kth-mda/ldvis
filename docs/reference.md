@@ -1,5 +1,16 @@
 # LDVis reference manual
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+
+- [Mapping Language Reference](#mapping-language-reference)
+  - [Mapto language](#mapto-language)
+    - [Node functions](#node-functions)
+    - [Line functions](#line-functions)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Mapping Language Reference
 
 The specification consists of one or more:
@@ -37,7 +48,7 @@ This is a JavaScript program, that has a small predefined set of objects, functi
 |borderColor(c)|Sets the color of the border of the node. Same coding as for color.|
 |cornerRadius(r)|Sets the radius in pixels of the node rectangle corners.|
 |layout(l)|Sets the layout algorithm for child nodes of this node. l can be 'vbox' (default), 'hbox' or 'xy'. Where 'vbox' is vertical downwards, 'hbox' is horisontal rightwards and 'xy' is absolutely positioned and manually movable by dragging.|
-|navigatable(href, target)|Navigates to href on node click. If optional target is specified, that is used as navigation target. If target is '_blank' or '_new' a new tab is opened for each navigation. If any other string is give, then a new tab is opened with that id. If the same target is used on a subsequent navigation, then the tab with that id is re-used. See documentation for HTML A element, for more information about navigation targets.|
+|navigatable(href, target)|Navigates to href on node click. If target is omitted, then the diagram page is replaced by the href page. If target is specified, then the href page is displayed in an other browser tab. If target is '_blank' or '_new' a new tab is opened for each navigation. If any other string is used, then a new tab is opened with that id. If the same target is used on a subsequent navigation, then the tab with that id is re-used. See documentation for HTML A element, for more information about navigation targets.|
 
 #### Line functions
 
