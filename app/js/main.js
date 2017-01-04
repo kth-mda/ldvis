@@ -258,6 +258,11 @@ function mapDataToGraph(mapExpr, data) {
         layout: function(value) {
           no.layout = value;
           return chainObject;
+        },
+        navigatable: function(href, target) {
+          no.href = href;
+          no.target = target;
+          return chainObject;
         }
       };
       return chainObject;
@@ -324,7 +329,6 @@ function getNodeLabel(d) {
 //
 function getRelationLabel(d) {
   let result = d.label;
-  console.log('rel label', result);
   return result !== undefined ? result.split('\n') : [parser.rdf.prefixes.shrink(d.relationUri)];
 }
 
@@ -387,7 +391,12 @@ let manipulator = new Manipulator()
       });
       renderAll();
     }))
-  .add(new SelectTool());
+  .add(new SelectTool().on('select', function(d) {
+    console.log('click', d);
+    if (d.href) {
+      window.open(d.href, d.target);
+    }
+  }));
 
 function renderAll() {
   var parent = '#diagramGraph';

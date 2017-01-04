@@ -25,7 +25,7 @@ This is a JavaScript program, that has a small predefined set of objects, functi
 |node(id)|function|Creates a node with the specified id, that becomes the label if no other label is specieid. Id must be a string.|
 |line(sourceId, relationId, targetId)|function|Creates a line between node sourceId and node targetId. RelationId identifies the line, and is important when there are more than one line between a pair of nodes. With different relationId they are created separately.|
 |i|variable|The query result row number, starting with 0.|
-|console|object|An object that can be used for debug logging. Use console.log('i', i); to log 0, 1, 2 etc to the browser javascript console. It can be used for debugging the progrm.|
+|console|object|An object that can be used for debug logging. Use console.log('i', i); to log 0, 1, 2 etc to the browser javascript console. It can be used for debugging the program.|
 
 #### Node functions
 
@@ -37,6 +37,7 @@ This is a JavaScript program, that has a small predefined set of objects, functi
 |borderColor(c)|Sets the color of the border of the node. Same coding as for color.|
 |cornerRadius(r)|Sets the radius in pixels of the node rectangle corners.|
 |layout(l)|Sets the layout algorithm for child nodes of this node. l can be 'vbox' (default), 'hbox' or 'xy'. Where 'vbox' is vertical downwards, 'hbox' is horisontal rightwards and 'xy' is absolutely positioned and manually movable by dragging.|
+|navigatable(href, target)|Navigates to href on node click. If optional target is specified, that is used as navigation target. If target is '_blank' or '_new' a new tab is opened for each navigation. If any other string is give, then a new tab is opened with that id. If the same target is used on a subsequent navigation, then the tab with that id is re-used. See documentation for HTML A element, for more information about navigation targets.|
 
 #### Line functions
 
