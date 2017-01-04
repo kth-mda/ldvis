@@ -16,7 +16,7 @@ app.use(webpackDevMiddleware(webpack(config), {}));
 app.use(bodyParser.json());
 
 // return web application page
-app.use('/diagram/:id/edit', function(request, response, next) {
+app.use('/diagrams/:id/edit', function(request, response, next) {
   if (request.method === 'GET') {
     if (acceptsWithParam('html', request) === 'html') {
       addAntiCacheHeaders(response);
@@ -27,8 +27,8 @@ app.use('/diagram/:id/edit', function(request, response, next) {
 });
 
 // diagram file read/update/delete
-app.use('/diagram/:id', function(request, response, next) {
-  console.log("app.use('/diagram/:id', ...");
+app.use('/diagrams/:id', function(request, response, next) {
+  console.log("app.use('/diagrams/:id', ...");
   var id = request.params.id; // get diagram id from URL
   var getPath = () => 'specs/' + id + '.spec';
 
@@ -89,9 +89,9 @@ app.use('/diagram/:id', function(request, response, next) {
 });
 
 // create a new diagram with a random id, and respond with the id
-app.post('/diagram', function(request, response) {
+app.post('/diagrams', function(request, response) {
   // generate a random 5 char alphanumeric string
-  console.log("app.post('/diagram', ...");
+  console.log("app.post('/diagrams', ...");
   function getRandomId() {return (Math.random() + 1).toString(36).substring(7, 12)}
 console.log('request.body', request.body);
   function createNew(maxTries) {
@@ -118,8 +118,8 @@ console.log('request.body', request.body);
 });
 
 
-app.use('/diagram', function(request, response, next) {
-  console.log("app.use('/diagram', ...");
+app.use('/diagrams', function(request, response, next) {
+  console.log("app.use('/diagrams', ...");
   console.log('accept:', request.get('accept'));
   if (acceptsWithParam('html', request) === 'html') {
     // return diagram list page
@@ -216,6 +216,14 @@ app.get('/proxy', function (request, response) {
         response.status(resp.statusCode).send(body);
       }
     });
+  }
+});
+
+app.use('/', function(request, response, next) {
+  if (request.path === '/') {
+    response.redirect('/diagrams');
+  } else {
+    next();
   }
 });
 

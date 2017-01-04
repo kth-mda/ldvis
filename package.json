@@ -6,7 +6,8 @@
   "scripts": {
     "start": "opener http://localhost:3015 && node server.js",
     "dev": "opener http://localhost:3015 && nodemon --watch server.js server.js",
-    "toc": "doctoc README.md"
+    "toc": "doctoc README.md",
+    "licenses": "license-checker"
   },
   "repository": "git@github.com:FindOut/ldvis.git",
   "author": "dag.rende@find-out.se",

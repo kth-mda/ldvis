@@ -1,7 +1,3 @@
-require('jquery-ui/themes/base/core.css');
-require('jquery-ui/themes/base/menu.css');
-// require('jquery-ui/themes/base/dialog.css');
-require('jquery-ui/themes/base/theme.css');
 import $ from 'jquery';
 
 import Split from 'split.js';
@@ -96,7 +92,7 @@ function saveSpec() {
         console.log(this.responseText);
       }
     };
-    xhr.open("put", 'diagram/' + decodedLocation.id, true);
+    xhr.open("put", 'diagrams/' + decodedLocation.id, true);
     xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.send(JSON.stringify({title: titleInput.property('value'), spec: mappingspec.property('value')}));
   }
@@ -129,7 +125,6 @@ let prefixHandler = new PrefixHandler();
    end
 */
 function runSpec(spec) {
-  // diagramData = parser.rdf.createGraph();
   dd = {nodes: {}, lines: {}, topNodes: []};
   let parsedSpecs = parseSpec(spec);
   Promise.all(_.map(parsedSpecs, function(parsedSpec) {
@@ -153,6 +148,8 @@ function runSpec(spec) {
     });
   })).then(function() {
     prepareNodeTree();
+
+    console.log('dd',dd);
 
     hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
     renderAll(dd.topNodes);
@@ -224,14 +221,11 @@ function mapDataToGraph(mapExpr, data) {
       }
       let chainObject = {
         label: function(...lines) {
-          let nlSeparated = _.map(lines, shrinkResultUri).join('\n')
-          no.label = nlSeparated;
-          // addTriple(diagramData, peelUri(id), OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          no.label = _.map(lines, shrinkResultUri).join('\n');
           return chainObject;
         },
         cornerRadius: function(radius) {
           no.cornerRadius = radius;
-          // addTriple(diagramData, peelUri(id), OSLCKTH('cornerRadius'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
           return chainObject;
         },
         padding: function(paddingSize) {
@@ -246,17 +240,14 @@ function mapDataToGraph(mapExpr, data) {
         },
         color: function(value) {
           no.color = value;
-          // addTriple(diagramData, peelUri(id), OSLCKTH('color'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         },
         borderColor: function(value) {
           no.borderColor = value;
-          // addTriple(diagramData, peelUri(id), OSLCKTH('borderColor'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         },
         parent: function(value) {
           no.parent = value;
-          // addTriple(diagramData, peelUri(id), OSLCKTH('parent'), peelUri(value));
           return chainObject;
         },
         tooltip: function(value) {
@@ -266,7 +257,6 @@ function mapDataToGraph(mapExpr, data) {
         },
         layout: function(value) {
           no.layout = value;
-          // addTriple(diagramData, peelUri(id), OSLCKTH('layout'), peelUri(value));
           return chainObject;
         }
       };
@@ -334,7 +324,8 @@ function getNodeLabel(d) {
 //
 function getRelationLabel(d) {
   let result = d.label;
-  return result ? result.split('\n') : [parser.rdf.prefixes.shrink(d.relationUri)];
+  console.log('rel label', result);
+  return result !== undefined ? result.split('\n') : [parser.rdf.prefixes.shrink(d.relationUri)];
 }
 
 function getNodeColor(d) {
@@ -357,18 +348,6 @@ function getNodeCornerRadius(d) {
   return result ? +result.toString() : 0;
 }
 
-// function getChildren(parent, data) {
-//   let parentLessSubject = triple => data.match(triple.subject, OSLCKTH('parent'), null).length == 0;
-//   if (parent) {
-//     let children = data.match(null, OSLCKTH('parent'), parent).toArray();
-//     return _.map(children, d => d.subject.toString());
-//   } else {
-//     let visibleObjects = data.match(null, OSLCKTH('visible'), null)
-//       .filter(parentLessSubject).toArray();
-//     return _.map(visibleObjects, d => d.subject.toString());
-//   }
-// }
-
 // data is a map of nodes by id
 function getChildren(parent, data) {
   // console.log('getChildren(', parent, ', ',data,')');
@@ -385,34 +364,14 @@ function getComponent(d) {
   return component;
 }
 
-// function getRelations() {
-//   let relations = [];
-//   let visibleObjects = diagramData.filter(t => t.predicate.toString() === OSLCKTH('visible'));
-//   matchForEachTriple(diagramData, null, RDF('type'), OSLCKTH('relation'), function (relationTypeTriple) {
-//     let from = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('from'))
-//     let relationUri = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('relationUri'))
-//     let to = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('to'))
-//     if (visibleObjects.some(t => t.subject.toString() === from.toString()) &&
-//       visibleObjects.some(t => t.subject.toString() === to.toString())) {
-//       // both subject and object of this relation is visible in diagram
-//       relations.push({
-//         id: relationTypeTriple.subject,
-//         from: from.toString(),
-//         to: to.toString(),
-//         relationUri: relationUri.toString()
-//       })
-//     }
-//   });
-//   return relations;
-// }
-
 function getRelations() {
   return _.map(dd.lines, function(relation) {
     return {
       id: relation.id,
       from: relation.from,
       relationUri: relation.relationUri,
-      to: relation.to
+      to: relation.to,
+      label: relation.label
     };
   });
 }
@@ -423,8 +382,8 @@ let manipulator = new Manipulator()
   .add(new MoveNodeTool()
     .on('end', (sourceEls, targetEl, targetRelPosList) => {
       sourceEls.each(function (d, i) {
-        setTripleObject(diagramData, d, OSLCKTH('posx'), parser.rdf.createLiteral(targetRelPosList[i].x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-        setTripleObject(diagramData, d, OSLCKTH('posy'), parser.rdf.createLiteral(targetRelPosList[i].y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+        d.x = targetRelPosList[i].x;
+        d.y = targetRelPosList[i].y;
       });
       renderAll();
     }))
@@ -446,8 +405,8 @@ function renderAll() {
   });
   separateOverlappingRelations(relsEls);
 
-  // d3.selectAll(parent + ' .obj')
-  //   .call(manipulator);
+  d3.selectAll(parent + ' .obj')
+    .call(manipulator);
 }
 
 function peelUri(uri) {
@@ -553,10 +512,10 @@ function PrefixHandler() {
   }
 }
 
-// returns an object if URL matches /diagram[/id], with the id attribute set only if id is present
+// returns an object if URL matches diagrams[/id], with the id attribute set only if id is present
 function decodeLocation() {
   var parts = document.location.pathname.split('/');
-  var isDiagram = parts[1] === 'diagram';
+  var isDiagram = parts[1] === 'diagrams';
   var id = parts[2];
   var isEdit = parts[3] === 'edit';
   if (isDiagram) {
@@ -571,19 +530,20 @@ function decodeLocation() {
 }
 
 // document.location.pathname:
-// /diagram - show list and update it from server
-// /diagram/<id> - read diagram info from server, run and show diagram
-// /diagram/<id>/edit - read diagram info from server, open editor without running diagram
+// diagrams - show list and update it from server
+// diagrams/<id> - read diagram info from server, run and show diagram
+// diagrams/<id>/edit - read diagram info from server, open editor without running diagram
 function showAccordingToUrl() {
   var decodedLocation = decodeLocation();
   if (decodedLocation) {
     if (decodedLocation.id) {
       // get spec by id and set editor to it
-      getJson('/diagram/' + decodedLocation.id, function (data) {
+      getJson('diagrams/' + decodedLocation.id, function (data) {
         mappingspec.property('value', data.spec);
         titleInput.property('value', data.title);
         if (decodedLocation.edit) {
           showCard('ui', 'editorCard');
+          document.title = 'Edit ' + data.title + ' - LDVis';
           renderAll();
         } else {
           showCard('ui', 'diagramCard');
@@ -608,22 +568,22 @@ onpopstate = function() {
 }
 
 function renderList() {
-  getJson('/diagram', function(diagrams) {
+  getJson('diagrams', function(diagrams) {
     console.log('diagrams', diagrams);
     let mtimeComparator = (a, b) => a.mtime - b.mtime;
     let tr = d3.select('#listCard table').selectAll('tr').data(diagrams.sort(mtimeComparator), d => d.id);
     let trEnter = tr.enter().append('tr');
     let trEnterTd = trEnter.append('td');
     trEnterTd.append('span').text(d => d.title).on('click', function(d) {
-        window.history.pushState(d.id, d.title, '/diagram/' + d.id);
+        window.history.pushState(d.id, d.title, 'diagrams/' + d.id);
         showAccordingToUrl();
     });
     trEnterTd.append('button').text('Edit').on('click', function(d) {
-      window.history.pushState(d.id, '', '/diagram/' + d.id + '/edit');
+      window.history.pushState(d.id, '', 'diagrams/' + d.id + '/edit');
       showAccordingToUrl();
     });
     trEnterTd.append('button').text('Delete').on('click', function(d) {
-      d3.request('/diagram/' + d.id)
+      d3.request('diagrams/' + d.id)
       .on('error', function(err) { console.error(err); })
       .on('load', function(err) { showAccordingToUrl(); })
       .send('delete');
@@ -632,9 +592,9 @@ function renderList() {
   });
 
   d3.select('#addDiagramButton').on('click', function(d) {
-    postJson('/diagram', function(newDiagramMetadata) {
+    postJson('diagrams', function(newDiagramMetadata) {
       console.log('newDiagramMetadata.id', newDiagramMetadata.id);
-      window.history.pushState(newDiagramMetadata.id, '', '/diagram/' + newDiagramMetadata.id + '/edit');
+      window.history.pushState(newDiagramMetadata.id, '', 'diagrams/' + newDiagramMetadata.id + '/edit');
       showAccordingToUrl();
     });
   });

@@ -10,13 +10,6 @@ mapto
   <mapto script>
 end
 
-or, if multiple specifications is needed:
-
-group
-  <mapping specification 1>
-  <mapping specification 2>
-  ...
-end
 
 ### Sparql server url
 

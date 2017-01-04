@@ -1,4 +1,4 @@
 {
-  "title": "New Diagram 5",
-  "spec": "server\n    http://dbpedia.org/sparql\nquery\n    select ?s ?p ?o\n    where {\n      ?s ?p ?o.\n    }\n    limit 5\nmapto\n    node(?s); \nend\n"
+  "title": "First five wikipedia subjects",
+  "spec": "server\n    http://dbpedia.org/sparql\nquery\n    select ?s ?p ?o\n    where {\n      ?s ?p ?o.\n    }\n    limit 5\nmapto\n    node(?s).color('RGB(123, 234, 223)')\nend\n"
 }
