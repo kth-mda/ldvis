@@ -18,19 +18,27 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
-A web app that visualizes objects and relations from a triple store based on a mapping specification.
+LDVis is a web app that visualizes objects and relations from a triple store based on a mapping specification.
 
 ![edit a diagram mapping specification](docs/edit-ex1.png)
 
 Click Run to render a diagram according to the specification.
 
-When you are satisfies with the specification, you can view just the diagram - always based on fresh data from the database.
+When you are satisfied with the specification, you can view just the diagram - always based on fresh data from the database.
 
 ![show diagram](docs/diagram-ex1.png)
 
-You can get a list of all diagrams
+You can get a list of all diagrams.
 
 ![show list](docs/list-ex1.png)
+
+Currently any user can create, remove and run any diagram.
+
+LDVis runs on a server that stores the diagrams with their mapping specification and title. LDVis runs in the browser. The server interactions occur only:
+- when you starts LDVis, to deliver the web application to your browser
+- when you run or edit a diagram, to deliver the specification to the web app
+- when you edit the mapping specification, the web app regularily sends the changed specification to be saved in the server
+- when you run the diagram, the web app sends a request for data to the LDVis server that forwards the request to the triple server that returns the result to the LDVis server that send it back to the web application that renders the diagram
 
 ## The mapping specification
 

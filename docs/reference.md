@@ -38,6 +38,16 @@ This is a JavaScript program, that has a small predefined set of objects, functi
 |i|variable|The query result row number, starting with 0.|
 |console|object|An object that can be used for debug logging. Use console.log('i', i); to log 0, 1, 2 etc to the browser javascript console. It can be used for debugging the program.|
 
+The node and line functions below, sets some attribute and then returns the node or line. This make it possible to chain multiple function calls together.
+
+node(?s).label(?title).color('blue');
+
+Or if you want, set a variable to do the calls in steps.
+
+var node1 = node(?s);
+node1.label(?title).color('blue');
+
+
 #### Node functions
 
 |name|description|
@@ -48,7 +58,7 @@ This is a JavaScript program, that has a small predefined set of objects, functi
 |borderColor(c)|Sets the color of the border of the node. Same coding as for color.|
 |cornerRadius(r)|Sets the radius in pixels of the node rectangle corners.|
 |layout(l)|Sets the layout algorithm for child nodes of this node. l can be 'vbox' (default), 'hbox' or 'xy'. Where 'vbox' is vertical downwards, 'hbox' is horisontal rightwards and 'xy' is absolutely positioned and manually movable by dragging.|
-|navigatable(href, target)|Navigates to href on node click. If target is omitted, then the diagram page is replaced by the href page. If target is specified, then the href page is displayed in an other browser tab. If target is '_blank' or '_new' a new tab is opened for each navigation. If any other string is used, then a new tab is opened with that id. If the same target is used on a subsequent navigation, then the tab with that id is re-used. See documentation for HTML A element, for more information about navigation targets.|
+|click(href, target)|Navigates to href on node click. If target is omitted, then the diagram page is replaced by the href page. If target is specified, then the href page is displayed in an other browser tab. If target is '_blank' or '_new' a new tab is opened for each navigation. If any other string is used, then a new tab is opened with that id. If the same target is used on a subsequent navigation, then the tab with that id is re-used. See documentation for HTML A element, for more information about navigation targets.|
 
 #### Line functions
 

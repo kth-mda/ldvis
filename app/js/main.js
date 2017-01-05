@@ -259,7 +259,7 @@ function mapDataToGraph(mapExpr, data) {
           no.layout = value;
           return chainObject;
         },
-        navigatable: function(href, target) {
+        click: function(href, target) {
           no.href = href;
           no.target = target;
           return chainObject;
