@@ -1,10 +1,4 @@
-require('jquery-ui/themes/base/core.css');
-require('jquery-ui/themes/base/menu.css');
-// require('jquery-ui/themes/base/dialog.css');
-require('jquery-ui/themes/base/theme.css');
 import $ from 'jquery';
-let draggable = require('jquery-ui/ui/widgets/draggable');
-draggable();
 
 import Split from 'split.js';
 import RdfXmlParser from 'rdf-parser-rdfxml';
@@ -24,14 +18,25 @@ import {
 import debounce from 'debounce';
 import {compileCode} from './compilecode';
 
-let initialServerUrl = 'https://git.md.kth.se/fuseki/import-cpse/query';
-
 var parser = new RdfXmlParser();
 
 let contextMenu = d3ctx(d3);
 
+let titleInput = d3.select('#titleInput');
+let mappingspec = d3.select('#mappingspec');
+
+
 // loadPrefixes(parser.rdf.prefixes).then(function() {
 // });
+
+// for all immediate children of element cardsId having class 'card', display only the element with id cardId
+function showCard(cardsId, cardId) {
+  d3.selectAll('#' + cardsId + ' > .card').each(function(d) {
+    this.style.display = (this.id === cardId ? 'block' : 'none');
+  })
+}
+
+showCard('ui', 'editorCard');
 
 // handle page layout
 function adjustUISize() {
@@ -40,6 +45,7 @@ function adjustUISize() {
 $(window).resize(adjustUISize);
 adjustUISize();
 
+// set adjustable splitter between spec editor and diagram
 Split(['#leftcol', '#rightcol'], {
   sizes: [50, 50],
   minSize: 200,
@@ -47,12 +53,7 @@ Split(['#leftcol', '#rightcol'], {
   snapOffset: 1
 });
 
-// init mapping spec field
-let mappingspec = d3.select('#mappingspec');
-d3.json('mappingspecs', function (data) {
-  mappingspec.property('value', data[0].text);
-});
-
+// returns the selected text, or the whole text if none selected
 function getAllTextOrSelection() {
   let from = mappingspec.node().selectionStart;
   let to = mappingspec.node().selectionEnd;
@@ -62,37 +63,42 @@ function getAllTextOrSelection() {
   return mappingspec.property('value');
 }
 
+// handle keyboard events
 d3.select('body').on('keyup', function () {
   if (d3.event.ctrlKey && d3.event.key === 'r') {
     // ctrl-r  - run spec
     runSpec(getAllTextOrSelection());
   } else {
-    // other key - save spec
-    debouncedSpecChanged();
+    // other key - save spec to server
+    debouncedSaveSpec();
   }
 });
 
+// handle run button
 d3.select('#runButton').on('click', function() {
+  // run spec
   runSpec(getAllTextOrSelection());
 });
 
-let debouncedSpecChanged = debounce(specChanged, 5000);
+let debouncedSaveSpec = debounce(saveSpec, 3000);
 
-function specChanged() {
-  console.log('saving mappingspec');
-  var xhr = new XMLHttpRequest();
-  xhr.onload = function () {
-    if (xhr.onReady != undefined) {
-      console.log(this.responseText);
-    }
-  };
-  xhr.open("post", 'mappingspecs', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.send(JSON.stringify([{
-    text: mappingspec.property('value')
-  }]));
+function saveSpec() {
+  var decodedLocation = decodeLocation();
+  if (decodedLocation && decodedLocation.id) {
+    console.log('saving mappingspec');
+    var xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      if (xhr.onReady != undefined) {
+        console.log(this.responseText);
+      }
+    };
+    xhr.open("put", 'diagrams/' + decodedLocation.id, true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send(JSON.stringify({title: titleInput.property('value'), spec: mappingspec.property('value')}));
+  }
 }
 
+// returns query with prefixes from parser.rdf.prefixes prepended
 function addPrefixes(query) {
   return getSparqlPrefixes(parser.rdf.prefixes) + '\n' + query;
 }
@@ -108,57 +114,98 @@ function getLineWord(s) {
 
 let prefixHandler = new PrefixHandler();
 
-// for each spec in text, calls specHandler(server, query, mapTo)
-function getSpecs(text, specHandler) {
-  let isGroup = false;
-  let n = 0;
-  let word = getLineWord(text);
-  if (word.trim() === 'group') {
-    isGroup = true;
-    n += word.length;
-  }
-  let maxSpecs = 10;
-  while (true) {
-    text = text.substring(n);
-    if (getLineWord(text).trim() === 'end' || maxSpecs-- <= 0) {
-      break;
-    }
-    let pattern = /\s+server([\s\S]*?)\n\s*query([\s\S]*?)mapto([\s\S]*?)end\b/m;
-    let match = pattern.exec(text);
-    if (match) {
-      let server = match[1];
-      let query = match[2];
-      let mapTo = match[3];
-      specHandler(server, query, mapTo);
-    }
-    n = match[0].length;
-  }
-}
-
-// execute sparql query and map to diagram objects
+/* Executes spec by sending sparql query to server and map response to diagram objects.
+ Spec has one or more:
+   server
+     <sparql server url>
+   query
+    <sparql select query>
+   mapto
+     <calls to node, line and functions on their results>
+   end
+*/
 function runSpec(spec) {
-  let type = '0';
-  diagramData = parser.rdf.createGraph();
-  getSpecs(spec, function(server, query, mapTo) {
-//    query = addPrefixes(query);
-    loadSparqlTsv(server, query).then(function (data) {
+  dd = {nodes: {}, lines: {}, topNodes: []};
+  let parsedSpecs = parseSpec(spec);
+  Promise.all(_.map(parsedSpecs, function(parsedSpec) {
+    // return promises that have created nodes and lines in dd
+    return loadSparqlTsv(parsedSpec.server, parsedSpec.query).then(function (data) {
       if (data && data.length > 0) {
         // remove comments
-        mapTo = mapTo.replace(/^\/\/.*?$/gm, '');
+        parsedSpec.mapTo = parsedSpec.mapTo.replace(/^\/\/.*?$/gm, '');
         // replace ?x in mapTo with obj['?x']
         _.forEach(Object.keys(data[0]), function(key) {
-          let pattern = '\\' + key + '\\b';
-          mapTo = mapTo.replace(new RegExp(pattern, 'mg'), "obj['" + key + "']");
+          // fix result that uses keys without ? - dbpedia for example
+          let patternKey = key;
+          if (key[0] !== '?') {
+            patternKey = '?' + key;
+          }
+          let pattern = '\\' + patternKey + '\\b';
+          parsedSpec.mapTo = parsedSpec.mapTo.replace(new RegExp(pattern, 'mg'), "obj['" + key + "']");
         });
-        mapDataToGraph(mapTo, data, type);
+        mapDataToGraph(parsedSpec.mapTo, data);
       }
     });
-    type = (+type + 1).toString();
+  })).then(function() {
+    prepareNodeTree();
+
+    console.log('dd',dd);
+
+    hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
+    renderAll(dd.topNodes);
   });
 }
 
+// add each node to the children array of its parent
+// and collect all top level nodes in array dd.topNodes
+function prepareNodeTree() {
+  dd.topNodes = [];
+  for (let nodeId in dd.nodes) {
+    let node = dd.nodes[nodeId];
+    if (node.parent) {
+      let parentNode = dd.nodes[node.parent];
+      if (parentNode) {
+        // node has an existing parent node
+        if (parentNode.children) {
+          parentNode.children.push(node);
+        } else {
+          parentNode.children = [node];
+        }
+      } else {
+        console.error('missing parent', node.parent, 'of node', node.id);
+      }
+    } else {
+      // node has no parent - its a top node
+      dd.topNodes.push(node);
+    }
+  }
+}
+
+// separates each spec in text into {server, query and mapTo} returns array of them
+function parseSpec(text) {
+  let parsedSpecs = [];
+  let n = 0;
+  let maxSpecs = 20;
+  while (true) {
+    text = text.substring(n);
+    if (text.trim() === '' || maxSpecs-- <= 0) {
+      break;
+    }
+    let pattern = /\s*server([\s\S]*?)\n\s*query([\s\S]*?)mapto([\s\S]*?)end\b/m;
+    let match = pattern.exec(text);
+    if (match) {
+      parsedSpecs.push({server: match[1], query: match[2], mapTo: match[3]});
+      n = match[0].length;
+    } else {
+      console.error('spec does not match: server ... query ... mapto ... end');
+      break;
+    }
+  }
+  return parsedSpecs;
+}
+
 // create graphical objects from data according to mapExpr
-function mapDataToGraph(mapExpr, data, type) {
+function mapDataToGraph(mapExpr, data) {
   // compile spec
   let compiledMapTo = compileCode(mapExpr);
 
@@ -167,55 +214,75 @@ function mapDataToGraph(mapExpr, data, type) {
   // - a function to run for each data item
   _.forEach(data, function(obj, i) {
     function node(id) {
-      addDiagramObject(id, 10, 10 + i * 40);
+      let no = dd.nodes[id];
+      if (!no) {
+        no = {id: id, x: 10, y: 10 + i * 40};
+        dd.nodes[id] = no;
+      }
       let chainObject = {
         label: function(...lines) {
-          let nlSeparated = _.map(lines, shrinkResultUri).join('\n')
-          addTriple(diagramData, peelUri(id), OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          no.label = _.map(lines, shrinkResultUri).join('\n');
           return chainObject;
         },
         cornerRadius: function(radius) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('cornerRadius'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+          no.cornerRadius = radius;
           return chainObject;
         },
-        padding: function(radius) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('padding'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+        padding: function(paddingSize) {
+          no.padding = paddingSize;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('padding'), parser.rdf.createLiteral(paddingSize.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
           return chainObject;
         },
-        margin: function(radius) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('margin'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+        margin: function(marginSize) {
+          no.margin = marginSize;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('margin'), parser.rdf.createLiteral(radius.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
           return chainObject;
         },
         color: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('color'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          no.color = value;
           return chainObject;
         },
         borderColor: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('borderColor'), parser.rdf.createLiteral(value, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          no.borderColor = value;
           return chainObject;
         },
         parent: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('parent'), peelUri(value));
+          no.parent = value;
           return chainObject;
         },
         tooltip: function(value) {
-          console.log('node tooltip', value);
-          addTriple(diagramData, peelUri(id), OSLCKTH('tooltip'), peelUri(value));
+          no.tooltip = value;
+          // addTriple(diagramData, peelUri(id), OSLCKTH('tooltip'), peelUri(value));
           return chainObject;
         },
         layout: function(value) {
-          addTriple(diagramData, peelUri(id), OSLCKTH('layout'), peelUri(value));
+          no.layout = value;
+          return chainObject;
+        },
+        click: function(href, target) {
+          no.href = href;
+          no.target = target;
           return chainObject;
         }
       };
       return chainObject;
     }
+    function lineId(s, p, o) {
+      return s + '#' + p + '#' + o;
+    }
     function line(s, p, o) {
-      let relationUri = addDiagramRelationObject(s, p, o, 10, 10 + i * 40);
+      let id = lineId(s, p, o);
+      let li = dd.lines[id];
+      if (!li) {
+        li = {id: id, from: s, relationUri: p, to: o};
+        dd.lines[id] = li;
+      }
+      // let relationUri = addDiagramRelationObject(s, p, o, 10, 10 + i * 40);
       let chainObject = {
         label: function(...lines) {
           let nlSeparated = _.map(lines, shrinkResultUri).join('\n')
-          addTriple(diagramData, relationUri, OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
+          li.label = nlSeparated;
+          // addTriple(diagramData, relationUri, OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
         }
       };
@@ -223,136 +290,94 @@ function mapDataToGraph(mapExpr, data, type) {
     }
     let mapToResult = compiledMapTo({node, line, obj, i, console, prefixes: prefixHandler});
   });
-
-  d3.select('svg').selectAll('.node').remove();
-  hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
-  renderAll();
-}
-
-// adds a new diagramobject of type with representing uri at document pos x, y
-function addDiagramObject(uri, x, y) {
-  addTriple(diagramData, peelUri(uri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-  addTriple(diagramData, peelUri(uri), OSLCKTH('posx'), parser.rdf.createLiteral(x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-  addTriple(diagramData, peelUri(uri), OSLCKTH('posy'), parser.rdf.createLiteral(y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-
-  return uri;
-}
-
-function addDiagramRelationObject(subjectUri, relationUri, objectUri) {
-  let relationSubject = parser.rdf.createBlankNode();
-  addTriple(diagramData, relationSubject, RDF('type'), OSLCKTH('relation'));
-  addTriple(diagramData, relationSubject, OSLCKTH('from'), peelUri(subjectUri));
-  addTriple(diagramData, relationSubject, OSLCKTH('relationUri'), peelUri(relationUri));
-  addTriple(diagramData, relationSubject, OSLCKTH('to'), peelUri(objectUri));
-
-  addTriple(diagramData, peelUri(subjectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-  addTriple(diagramData, peelUri(objectUri), OSLCKTH('visible'), parser.rdf.createLiteral('true', null, 'http://www.w3.org/2001/XMLSchema#boolean'));
-
-  return relationSubject;
 }
 
 // handle diagram
-let OSLCKTH = suffix => 'http://oslc.kth.se/ldexplorer#' + suffix;
+function OSLCKTH(suffix) {return 'http://oslc.kth.se/ldexplorer#' + suffix;}
 
-let diagramData = parser.rdf.createGraph();
+let dd = {nodes: {}, lines: {}, topNodes: []};
 
 // make id usable as a valid part of a d3.select expression, by replacing some chars by -
 function simplifyId(id) {
-    return id.replace(/[:/.]/g, '-');
+  return id.replace(/[:/.#<> ]/g, '-');
 }
 
-let svgComponent = new SvgComponent('top').layout(new XyLayout()
-  .dataX(d => +getOneObjectString(diagramData, d, OSLCKTH('posx')))
-  .dataY(d => +getOneObjectString(diagramData, d, OSLCKTH('posy'))));
+let svgComponent = new SvgComponent('top').layout(new XyLayout());
 let nodeComponent = new SimpleTextBoxComponent('obj')
-  .dataId(d => simplifyId(d)).label(getNodeLabel).tooltip(d=>d)
-  .backgroundColor(getNodeColor).foregroundColor(getNodeForegroundColor)
-  .cornerRadius(getNodeCornerRadius);
-let relationComponent = new RelationComponent('relation').label(getRelationLabel).tooltip(d=>d.relationUri);
-
-
+  .dataId(d => simplifyId(d.id)).label(d => [d.label || d.id])
+  .tooltip(d => d.id)
+  .backgroundColor(d => d.color).foregroundColor(d => d.borderColor)
+  .cornerRadius(d => d.cornerRadius);
+let relationComponent = new RelationComponent('relation').dataId(d => simplifyId(d)).label(getRelationLabel).tooltip(getTooltip);
 
 let nodeComponentByLayout = {
-  'xy': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-    .dataId(d => simplifyId(d)).layout(new XyLayout()).minSize({width: 10, height: 10}),
-  'hbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-    .dataId(d => simplifyId(d)).layout(new HBoxLayout()).minSize({width: 10, height: 10}),
-  'vbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(d=>d)
-    .dataId(d => simplifyId(d)).layout(new VBoxLayout()).minSize({width: 10, height: 10})
+  'xy': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
+    .dataId(d => simplifyId(d.id)).layout(new XyLayout()).minSize({width: 10, height: 10}),
+  'hbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
+    .dataId(d => simplifyId(d.id)).layout(new HBoxLayout()).minSize({width: 10, height: 10}),
+  'vbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
+    .dataId(d => simplifyId(d.id)).layout(new VBoxLayout()).minSize({width: 10, height: 10})
 };
 for (let c in nodeComponentByLayout) {
   nodeComponentByLayout[c].componentLayoutName = c;
 }
 
 function getNodeLabel(d) {
-  let result = getOneObject(diagramData, d, OSLCKTH('label'));
-  return result ? result.toString().split('\n') : [parser.rdf.prefixes.shrink(d)];
+  let result = d.label;
+  return result ? result.split('\n') : [parser.rdf.prefixes.shrink(d.id)];
 }
-
+//
 function getRelationLabel(d) {
-  let result = getOneObject(diagramData, d.id, OSLCKTH('label'));
-  return result ? result.toString().split('\n') : [parser.rdf.prefixes.shrink(d.relationUri)];
+  let result = d.label;
+  return result !== undefined ? result.split('\n') : [parser.rdf.prefixes.shrink(d.relationUri)];
 }
 
 function getNodeColor(d) {
-  let result = getOneObject(diagramData, d, OSLCKTH('color'));
+  let result = d.color;
   return result ? result.toString() : 'white';
 }
 
 function getNodeForegroundColor(d) {
-  let result = getOneObject(diagramData, d, OSLCKTH('borderColor'));
+  let result = d.borderColor;
   return result ? result.toString() : 'black';
 }
 
 function getTooltip(d) {
-  let result = getOneObject(diagramData, d, OSLCKTH('tooltip'));
-  console.log('tooltip', result);
-  return result ? result.toString() : d;
+  let result = d.toolTip;
+  return result ? result.toString() : d.id;
 }
 
 function getNodeCornerRadius(d) {
-  let result = getOneObject(diagramData, d, OSLCKTH('cornerRadius'));
+  let result = d.cornerRadius;
   return result ? +result.toString() : 0;
 }
 
+// data is a map of nodes by id
 function getChildren(parent, data) {
-  let parentLessSubject = triple => data.match(triple.subject, OSLCKTH('parent'), null).length == 0;
+  // console.log('getChildren(', parent, ', ',data,')');
   if (parent) {
-    let children = data.match(null, OSLCKTH('parent'), parent).toArray();
-    return _.map(children, d => d.subject.toString());
+    return parent.children;
   } else {
-    let visibleObjects = data.match(null, OSLCKTH('visible'), null)
-      .filter(parentLessSubject).toArray();
-    return _.map(visibleObjects, d => d.subject.toString());
+    return dd.topNodes;
   }
 }
 
 function getComponent(d) {
-  let layoutName = getOneObjectString(diagramData, d, OSLCKTH('layout'));
-  let nodeComponentResult = nodeComponentByLayout[layoutName];
+  let nodeComponentResult = nodeComponentByLayout[d.layout];
   let component = nodeComponentResult || nodeComponent;
   return component;
 }
 
 function getRelations() {
-  let relations = [];
-  let visibleObjects = diagramData.filter(t => t.predicate.toString() === OSLCKTH('visible'));
-  matchForEachTriple(diagramData, null, RDF('type'), OSLCKTH('relation'), function (relationTypeTriple) {
-    let from = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('from'))
-    let relationUri = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('relationUri'))
-    let to = getOneObject(diagramData, relationTypeTriple.subject, OSLCKTH('to'))
-    if (visibleObjects.some(t => t.subject.toString() === from.toString()) &&
-      visibleObjects.some(t => t.subject.toString() === to.toString())) {
-      // both subject and object of this relation is visible in diagram
-      relations.push({
-        id: relationTypeTriple.subject,
-        from: from.toString(),
-        to: to.toString(),
-        relationUri: relationUri.toString()
-      })
-    }
+  return _.map(dd.lines, function(relation) {
+    return {
+      id: relation.id,
+      from: relation.from,
+      relationUri: relation.relationUri,
+      to: relation.to,
+      label: relation.label
+    };
   });
-  return relations;
 }
 
 let hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
@@ -361,17 +386,27 @@ let manipulator = new Manipulator()
   .add(new MoveNodeTool()
     .on('end', (sourceEls, targetEl, targetRelPosList) => {
       sourceEls.each(function (d, i) {
-        setTripleObject(diagramData, d, OSLCKTH('posx'), parser.rdf.createLiteral(targetRelPosList[i].x.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
-        setTripleObject(diagramData, d, OSLCKTH('posy'), parser.rdf.createLiteral(targetRelPosList[i].y.toString(), null, 'http://www.w3.org/2001/XMLSchema#float'));
+        d.x = targetRelPosList[i].x;
+        d.y = targetRelPosList[i].y;
       });
       renderAll();
     }))
-  .add(new SelectTool());
+  .add(new SelectTool().on('select', function(d) {
+    console.log('click', d);
+    if (d && d.href) {
+      window.open(d.href, d.target);
+    }
+  }));
 
 function renderAll() {
-  let svg = svgComponent(d3.select('#rightcol'));
-  hierarchyComponent(svg, diagramData);
-  svgComponent.layout()(d3.select('#rightcol svg'));
+  var parent = '#diagramGraph';
+  if (document.location.pathname.split('/')[3] === 'edit') {
+    parent = '#rightcol';
+  }
+  let svg = svgComponent(d3.select(parent));
+  hierarchyComponent(svg, dd);
+  svgComponent.layout()(d3.select(parent + ' svg'));
+
   let rels = getRelations();
   let relsEls = relationComponent(svg, rels);
   relsEls.each(function (d) {
@@ -379,10 +414,9 @@ function renderAll() {
   });
   separateOverlappingRelations(relsEls);
 
-  d3.selectAll('#rightcol .obj')
+  d3.selectAll(parent + ' .obj')
     .call(manipulator);
 }
-renderAll();
 
 function peelUri(uri) {
   return (uri.length > 2 && uri[0] === '<') ? uri.substring(1, uri.length - 1) : uri;
@@ -485,4 +519,108 @@ function PrefixHandler() {
       return shrinkResultUri(uri);
     }
   }
+}
+
+// returns an object if URL matches diagrams[/id], with the id attribute set only if id is present
+function decodeLocation() {
+  var parts = document.location.pathname.split('/');
+  var isDiagram = parts[1] === 'diagrams';
+  var id = parts[2];
+  var isEdit = parts[3] === 'edit';
+  if (isDiagram) {
+    if (id) {
+      return {id: id, edit: isEdit};
+    } else {
+      return {};
+    }
+  } else {
+    return null;
+  }
+}
+
+// document.location.pathname:
+// diagrams - show list and update it from server
+// diagrams/<id> - read diagram info from server, run and show diagram
+// diagrams/<id>/edit - read diagram info from server, open editor without running diagram
+function showAccordingToUrl() {
+  var decodedLocation = decodeLocation();
+  if (decodedLocation) {
+    if (decodedLocation.id) {
+      // get spec by id and set editor to it
+      getJson('diagrams/' + decodedLocation.id, function (data) {
+        mappingspec.property('value', data.spec);
+        titleInput.property('value', data.title);
+        if (decodedLocation.edit) {
+          showCard('ui', 'editorCard');
+          document.title = 'Edit ' + data.title + ' - LDVis';
+          renderAll();
+        } else {
+          showCard('ui', 'diagramCard');
+          document.title = data.title + ' - LDVis';
+          runSpec(data.spec);
+        }
+      });
+    } else {
+      // no id - show diagram list
+      console.log('show list');
+      showCard('ui', 'listCard');
+      document.title = 'Diagram List - LDVis';
+      renderList();
+    }
+  }
+}
+showAccordingToUrl();
+
+onpopstate = function() {
+  console.log('popstate');
+  showAccordingToUrl();
+}
+
+function renderList() {
+  getJson('diagrams', function(diagrams) {
+    console.log('diagrams', diagrams);
+    let mtimeComparator = (a, b) => a.mtime - b.mtime;
+    let tr = d3.select('#listCard table').selectAll('tr').data(diagrams.sort(mtimeComparator), d => d.id);
+    let trEnter = tr.enter().append('tr');
+    let trEnterTd = trEnter.append('td');
+    trEnterTd.append('span').text(d => d.title).on('click', function(d) {
+        window.history.pushState(d.id, d.title, 'diagrams/' + d.id);
+        showAccordingToUrl();
+    });
+    trEnterTd.append('button').text('Edit').on('click', function(d) {
+      window.history.pushState(d.id, '', 'diagrams/' + d.id + '/edit');
+      showAccordingToUrl();
+    });
+    trEnterTd.append('button').text('Delete').on('click', function(d) {
+      d3.request('diagrams/' + d.id)
+      .on('error', function(err) { console.error(err); })
+      .on('load', function(err) { showAccordingToUrl(); })
+      .send('delete');
+    });
+    tr.exit().remove();
+  });
+
+  d3.select('#addDiagramButton').on('click', function(d) {
+    postJson('diagrams', function(newDiagramMetadata) {
+      console.log('newDiagramMetadata.id', newDiagramMetadata.id);
+      window.history.pushState(newDiagramMetadata.id, '', 'diagrams/' + newDiagramMetadata.id + '/edit');
+      showAccordingToUrl();
+    });
+  });
+}
+
+function getJson(url, f) {
+  d3.request(url)
+  .header("Accept", "application/json")
+  .header('Content-Type', 'application/json')
+  .response(function(xhr) { return JSON.parse(xhr.responseText); })
+  .get(f);
+}
+
+function postJson(url, f) {
+  d3.request(url)
+  .header("Accept", "application/json")
+  .response(function(xhr) { return JSON.parse(xhr.responseText); })
+  .header('Content-Type', 'application/json')
+  .send('post', JSON.stringify({title: 'New Diagram', spec: 'server\n    http://dbpedia.org/sparql\nquery\n    select ?s ?p ?o\n    where {\n      ?s ?p ?o.\n    }\n    limit 5\nmapto\n    node(?s); \nend\n'}), f);
 }
