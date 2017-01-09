@@ -7,7 +7,7 @@
     "start": "opener http://localhost:3015 && node server.js",
     "dev": "opener http://localhost:3015 && nodemon --watch server.js server.js",
     "toc": "doctoc README.md",
-    "licenses": "license-checker"
+    "licenses": "license-checker --json | ./license-index.js"
   },
   "repository": "git@github.com:FindOut/ldvis.git",
   "author": "dag.rende@find-out.se",

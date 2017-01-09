@@ -299,7 +299,7 @@ let dd = {nodes: {}, lines: {}, topNodes: []};
 
 // make id usable as a valid part of a d3.select expression, by replacing some chars by -
 function simplifyId(id) {
-  return id.replace(/[:/.#<>]/g, '-');
+  return id.replace(/[:/.#<> ]/g, '-');
 }
 
 let svgComponent = new SvgComponent('top').layout(new XyLayout());
@@ -393,7 +393,7 @@ let manipulator = new Manipulator()
     }))
   .add(new SelectTool().on('select', function(d) {
     console.log('click', d);
-    if (d.href) {
+    if (d && d.href) {
       window.open(d.href, d.target);
     }
   }));
