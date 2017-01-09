@@ -25,19 +25,6 @@ let contextMenu = d3ctx(d3);
 let titleInput = d3.select('#titleInput');
 let mappingspec = d3.select('#mappingspec');
 
-
-// loadPrefixes(parser.rdf.prefixes).then(function() {
-// });
-
-// for all immediate children of element cardsId having class 'card', display only the element with id cardId
-function showCard(cardsId, cardId) {
-  d3.selectAll('#' + cardsId + ' > .card').each(function(d) {
-    this.style.display = (this.id === cardId ? 'block' : 'none');
-  })
-}
-
-showCard('ui', 'editorCard');
-
 // handle page layout
 function adjustUISize() {
   $('#ui').height($(window).innerHeight());
@@ -313,15 +300,16 @@ let nodeComponent = new SimpleTextBoxComponent('obj')
 let relationComponent = new RelationComponent('relation').dataId(d => simplifyId(d)).label(getRelationLabel).tooltip(getTooltip);
 
 let nodeComponentByLayout = {
-  'xy': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
-    .dataId(d => simplifyId(d.id)).layout(new XyLayout()).minSize({width: 10, height: 10}),
-  'hbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
-    .dataId(d => simplifyId(d.id)).layout(new HBoxLayout()).minSize({width: 10, height: 10}),
-  'vbox': new SimpleTextBoxComponent('obj').label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
-    .dataId(d => simplifyId(d.id)).layout(new VBoxLayout()).minSize({width: 10, height: 10})
+  'xy': new SimpleTextBoxComponent('obj').layout(new XyLayout()),
+  'hbox': new SimpleTextBoxComponent('obj').layout(new HBoxLayout()),
+  'vbox': new SimpleTextBoxComponent('obj').layout(new VBoxLayout())
 };
+
 for (let c in nodeComponentByLayout) {
-  nodeComponentByLayout[c].componentLayoutName = c;
+  let nodeComponent = nodeComponentByLayout[c];
+  nodeComponent.label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
+    .dataId(d => simplifyId(d.id)).minSize({width: 10, height: 10});
+  nodeComponent.componentLayoutName = c;
 }
 
 // returns a label for node d - or node id if not specified
@@ -536,6 +524,13 @@ function decodeLocation() {
   } else {
     return null;
   }
+}
+
+// for all immediate children of element cardsId having class 'card', display only the element with id cardId
+function showCard(cardsId, cardId) {
+  d3.selectAll('#' + cardsId + ' > .card').each(function(d) {
+    this.style.display = (this.id === cardId ? 'block' : 'none');
+  })
 }
 
 // handle the whole web page according to URL in document.location.pathname:
