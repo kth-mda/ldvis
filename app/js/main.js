@@ -82,6 +82,7 @@ d3.select('#runButton').on('click', function() {
 
 let debouncedSaveSpec = debounce(saveSpec, 3000);
 
+// send put request to server with title and spec as json
 function saveSpec() {
   var decodedLocation = decodeLocation();
   if (decodedLocation && decodedLocation.id) {
@@ -181,7 +182,7 @@ function prepareNodeTree() {
   }
 }
 
-// separates each spec in text into {server, query and mapTo} returns array of them
+// separates each spec in text into {server, query and mapTo} and returns array of them
 function parseSpec(text) {
   let parsedSpecs = [];
   let n = 0;
@@ -292,7 +293,8 @@ function mapDataToGraph(mapExpr, data) {
   });
 }
 
-// handle diagram
+// diagram rendering
+
 function OSLCKTH(suffix) {return 'http://oslc.kth.se/ldexplorer#' + suffix;}
 
 let dd = {nodes: {}, lines: {}, topNodes: []};
@@ -322,21 +324,25 @@ for (let c in nodeComponentByLayout) {
   nodeComponentByLayout[c].componentLayoutName = c;
 }
 
+// returns a label for node d - or node id if not specified
 function getNodeLabel(d) {
   let result = d.label;
   return result ? result.split('\n') : [parser.rdf.prefixes.shrink(d.id)];
 }
-//
+
+// return a label for relation d, or relation id if not specified
 function getRelationLabel(d) {
   let result = d.label;
   return result !== undefined ? result.split('\n') : [parser.rdf.prefixes.shrink(d.relationUri)];
 }
 
+// returns node color (fill), or white if not specified
 function getNodeColor(d) {
   let result = d.color;
   return result ? result.toString() : 'white';
 }
 
+// get node foreground color (stroke), or black if not specified
 function getNodeForegroundColor(d) {
   let result = d.borderColor;
   return result ? result.toString() : 'black';
@@ -347,6 +353,7 @@ function getTooltip(d) {
   return result ? result.toString() : d.id;
 }
 
+// returns numeric corner radius, or 0 if not specified
 function getNodeCornerRadius(d) {
   let result = d.cornerRadius;
   return result ? +result.toString() : 0;
@@ -354,11 +361,10 @@ function getNodeCornerRadius(d) {
 
 // data is a map of nodes by id
 function getChildren(parent, data) {
-  // console.log('getChildren(', parent, ', ',data,')');
   if (parent) {
     return parent.children;
   } else {
-    return dd.topNodes;
+    return data.topNodes;
   }
 }
 
@@ -418,6 +424,7 @@ function renderAll() {
     .call(manipulator);
 }
 
+// removes < ... > from both ends of uri, if it starts with <
 function peelUri(uri) {
   return (uri.length > 2 && uri[0] === '<') ? uri.substring(1, uri.length - 1) : uri;
 }
@@ -456,13 +463,6 @@ function loadSparqlTsv(serverUrl, sparql) {
 // if uri has the form <xxxyyy> then the prefixed form is prefix:yyy
 function shrinkResultUri(uri) {
   return parser.rdf.prefixes.shrink(peelUri(uri));
-}
-
-function peelUri(uri) {
-  if (uri.length > 2 && uri[0] === '<') {
-    uri = uri.substring(1, uri.length - 1);
-  }
-  return uri;
 }
 
 function PrefixHandler() {
@@ -538,10 +538,10 @@ function decodeLocation() {
   }
 }
 
-// document.location.pathname:
-// diagrams - show list and update it from server
-// diagrams/<id> - read diagram info from server, run and show diagram
-// diagrams/<id>/edit - read diagram info from server, open editor without running diagram
+// handle the whole web page according to URL in document.location.pathname:
+//   diagrams - show list and update it from server
+//   diagrams/<id> - read diagram info from server, run and show diagram
+//   diagrams/<id>/edit - read diagram info from server, open editor without running diagram
 function showAccordingToUrl() {
   var decodedLocation = decodeLocation();
   if (decodedLocation) {
@@ -571,11 +571,10 @@ function showAccordingToUrl() {
 }
 showAccordingToUrl();
 
-onpopstate = function() {
-  console.log('popstate');
-  showAccordingToUrl();
-}
+// make window update according to url after browser back button click
+window.onpopstate = showAccordingToUrl;
 
+// render diagram list
 function renderList() {
   getJson('diagrams', function(diagrams) {
     console.log('diagrams', diagrams);
@@ -583,29 +582,37 @@ function renderList() {
     let tr = d3.select('#listCard table').selectAll('tr').data(diagrams.sort(mtimeComparator), d => d.id);
     let trEnter = tr.enter().append('tr');
     let trEnterTd = trEnter.append('td');
-    trEnterTd.append('span').text(d => d.title).on('click', function(d) {
-        window.history.pushState(d.id, d.title, 'diagrams/' + d.id);
-        showAccordingToUrl();
-    });
-    trEnterTd.append('button').text('Edit').on('click', function(d) {
-      window.history.pushState(d.id, '', 'diagrams/' + d.id + '/edit');
-      showAccordingToUrl();
-    });
-    trEnterTd.append('button').text('Delete').on('click', function(d) {
-      d3.request('diagrams/' + d.id)
-      .on('error', function(err) { console.error(err); })
-      .on('load', function(err) { showAccordingToUrl(); })
-      .send('delete');
-    });
+    trEnterTd.append('span').text(d => d.title).on('click', showDiagram);
+    trEnterTd.append('button').text('Edit').on('click', editDiagram);
+    trEnterTd.append('button').text('Delete').on('click', deleteDiagram);
     tr.exit().remove();
   });
 
-  d3.select('#addDiagramButton').on('click', function(d) {
-    postJson('diagrams', function(newDiagramMetadata) {
-      console.log('newDiagramMetadata.id', newDiagramMetadata.id);
-      window.history.pushState(newDiagramMetadata.id, '', 'diagrams/' + newDiagramMetadata.id + '/edit');
-      showAccordingToUrl();
-    });
+  d3.select('#addDiagramButton').on('click', addDiagram);
+}
+
+function showDiagram(d) {
+  window.history.pushState(d.id, d.title, 'diagrams/' + d.id);
+  showAccordingToUrl();
+}
+
+function editDiagram(d) {
+  window.history.pushState(d.id, '', 'diagrams/' + d.id + '/edit');
+  showAccordingToUrl();
+}
+
+function deleteDiagram(d) {
+  d3.request('diagrams/' + d.id)
+      .on('error', function(err) { console.error(err); })
+      .on('load', function(err) { showAccordingToUrl(); })
+      .send('delete');
+}
+
+function addDiagram(d) {
+  postJson('diagrams', function(newDiagramMetadata) {
+    console.log('newDiagramMetadata.id', newDiagramMetadata.id);
+    window.history.pushState(newDiagramMetadata.id, '', 'diagrams/' + newDiagramMetadata.id + '/edit');
+    showAccordingToUrl();
   });
 }
 
