@@ -3,7 +3,7 @@ import $ from 'jquery';
 import Split from 'split.js';
 import RdfXmlParser from 'rdf-parser-rdfxml';
 import _ from 'lodash';
-import {  d3,  SvgComponent,  SimpleTextBoxComponent,  RelationComponent,  HierarchyComponent,  HBoxLayout,
+import {  d3,  SvgComponent,  SimpleTextBoxComponent,  RelationComponent,  HierarchyComponent,  HBoxLayout, ForceLayout,
   VBoxLayout,  XyLayout,  Manipulator,  MoveNodeTool,  CreateMoveRelationTool,  SelectTool,  utils, separateOverlappingRelations
 } from '../../../fomod';
 import {
@@ -139,7 +139,7 @@ function runSpec(spec) {
 
     console.log('dd',dd);
 
-    hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
+    hierarchyComponent = new HierarchyComponent(getChildren, getComponent).layoutEnabled(false);
     renderAll(dd.topNodes);
   });
 }
@@ -302,7 +302,8 @@ let relationComponent = new RelationComponent('relation').dataId(d => simplifyId
 let nodeComponentByLayout = {
   'xy': new SimpleTextBoxComponent('obj').layout(new XyLayout()),
   'hbox': new SimpleTextBoxComponent('obj').layout(new HBoxLayout()),
-  'vbox': new SimpleTextBoxComponent('obj').layout(new VBoxLayout())
+  'vbox': new SimpleTextBoxComponent('obj').layout(new VBoxLayout()),
+  // 'force': new SimpleTextBoxComponent('obj').layout(new ForceLayout().on('tick', forceLayoutTick)
 };
 
 for (let c in nodeComponentByLayout) {
@@ -315,7 +316,7 @@ for (let c in nodeComponentByLayout) {
 // returns a label for node d - or node id if not specified
 function getNodeLabel(d) {
   let result = d.label;
-  return result ? result.split('\n') : [parser.rdf.prefixes.shrink(d.id)];
+  return result !== undefined ? result.split('\n') : [parser.rdf.prefixes.shrink(d.id)];
 }
 
 // return a label for relation d, or relation id if not specified
@@ -347,7 +348,7 @@ function getNodeCornerRadius(d) {
   return result ? +result.toString() : 0;
 }
 
-// data is a map of nodes by id
+// data is
 function getChildren(parent, data) {
   if (parent) {
     return parent.children;
@@ -362,8 +363,8 @@ function getComponent(d) {
   return component;
 }
 
-function getRelations() {
-  return _.map(dd.lines, function(relation) {
+function getRelations(data) {
+  return _.map(data.lines, function(relation) {
     return {
       id: relation.id,
       from: relation.from,
@@ -374,7 +375,7 @@ function getRelations() {
   });
 }
 
-let hierarchyComponent = new HierarchyComponent(getChildren, getComponent);
+let hierarchyComponent = new HierarchyComponent(getChildren, getComponent).layoutEnabled(false);
 
 let manipulator = new Manipulator()
   .add(new MoveNodeTool()
@@ -397,19 +398,57 @@ function renderAll() {
   if (document.location.pathname.split('/')[3] === 'edit') {
     parent = '#rightcol';
   }
+
   let svg = svgComponent(d3.select(parent));
   hierarchyComponent(svg, dd);
-  svgComponent.layout()(d3.select(parent + ' svg'));
 
-  let rels = getRelations();
-  let relsEls = relationComponent(svg, rels);
-  relsEls.each(function (d) {
-    this.fomod.layout(d3.select(this));
-  });
+  let relsEls = relationComponent(svg, getRelations(dd));
+
+  layoutAll();
   separateOverlappingRelations(relsEls);
 
-  d3.selectAll(parent + ' .obj')
-    .call(manipulator);
+  d3.selectAll(parent + ' .obj').call(manipulator);
+}
+
+function simulate(data) {
+  let simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(function(d) { return d.id; }))
+    .force("charge", d3.forceManyBody())
+    .force("center", d3.forceCenter(size.width / 2, size.height / 2))
+    .nodes(Object.values(data.nodes))
+    .on("tick", tick)
+    .on('end', end)
+    .alphaMin(0.01)
+    .force("link", d3.forceLink(Object.values(data.lines)).distance(150).strength(1));
+}
+
+function tick(d) {
+  console.log('tick', d);
+}
+
+function end(d) {
+  console.log('end', d);
+}
+
+function layoutAll () {
+  let svg = d3.select('svg');
+  layoutTree(svg.node(), 'node');
+  layoutTree(svg.node(), 'relation');
+}
+
+function layoutTree (el, clazz) {
+  if (el && el.nodeType === Node.ELEMENT_NODE) {
+  // console.log('el', el);
+    let childNodes = el.childNodes;
+    for (let i in childNodes) {
+      layoutTree(childNodes[i], clazz);
+    }
+    let d3el = d3.select(el);
+    if (d3el.classed(clazz)) {
+      // console.log('el.fomod.layout', d3el.attr('class'), el.fomod.layout);
+      el.fomod.layout && el.fomod.layout(d3.select(el));
+    }
+  }
 }
 
 // removes < ... > from both ends of uri, if it starts with <

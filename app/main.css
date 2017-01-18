@@ -29,6 +29,10 @@ input {
   background-color: #eee;
 }
 
+#listCard table button:nth-child(2) {
+  margin-left: 1em;
+}
+
 svg {
   background-color: #eee;
 }
