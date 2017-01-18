@@ -60,17 +60,20 @@ app.use('/diagrams/:id', function(request, response, next) {
     }
   } else if (request.method === 'PUT') {
     // replace diagram file contents with post data
-    fs.writeFile(getPath(), JSON.stringify(request.body, null, '  '), (err) => {
-      if (err) {
-        if (err.code && err.code === 'ENOENT') {
-          response.status(404).send(err.message);
+    if (isValidModel(request.body)) {
+      fs.writeFile(getPath(), JSON.stringify(request.body, null, '  '), (err) => {
+        if (err) {
+          if (err.code && err.code === 'ENOENT') {
+            response.status(404).send(err.message);
+          } else {
+            response.status(500).send(err.message);
+          }
         } else {
-          response.status(500).send(err.message);
+          response.status(204).end();
         }
-      } else {
-        response.status(204).end();
-      }
-    });
+      });
+
+    }
   } else if (request.method === 'DELETE') {
     // delete diagram file
     fs.unlink(getPath(), function(err) {
@@ -87,6 +90,15 @@ app.use('/diagrams/:id', function(request, response, next) {
     response.status(405).send('Method Not Allowed');
   }
 });
+
+function isValidModel(model) {
+  return model.title
+    && typeof model.title === 'string'
+    && model.title.length > 0
+    && model.spec
+    && typeof model.spec === 'string'
+    && model.spec.length > 0;
+}
 
 // create a new diagram with a random id, and respond with the id
 app.post('/diagrams', function(request, response) {
