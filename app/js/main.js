@@ -13,15 +13,14 @@ import {
 import d3ctx from 'd3-context-menu';
 import uuid from 'node-uuid';
 import {
-  loadPrefixes, getSparqlPrefixes, savePrefixes,  initPrefixDialog,  openAddPrefixDialog
+  loadPrefixes, getSparqlPrefixes, savePrefixes,  initPrefixDia,  openAddPrefixDia
 } from './prefix-manager';
 import debounce from 'debounce';
 import {compileCode} from './compilecode';
 
 var parser = new RdfXmlParser();
-
+let prevSpecData = null;
 let contextMenu = d3ctx(d3);
-
 let titleInput = d3.select('#titleInput');
 let mappingspec = d3.select('#mappingspec');
 
@@ -52,13 +51,8 @@ function getAllTextOrSelection() {
 
 // handle keyboard events
 d3.select('body').on('keyup', function () {
-  if (d3.event.ctrlKey && d3.event.key === 'r') {
-    // ctrl-r  - run spec
-    runSpec(getAllTextOrSelection());
-  } else {
-    // other key - save spec to server
-    debouncedSaveSpec();
-  }
+  // other key - save spec to server
+  debouncedSaveSpec({title: titleInput.property('value'), spec: mappingspec.property('value')});
 });
 
 // handle run button
@@ -67,10 +61,20 @@ d3.select('#runButton').on('click', function() {
   runSpec(getAllTextOrSelection());
 });
 
-let debouncedSaveSpec = debounce(saveSpec, 3000);
+let debouncedSaveSpec = debounce(saveSpecDataIfChanged, 500);
 
 // send put request to server with title and spec as json
-function saveSpec() {
+function saveSpecDataIfChanged(specData) {
+  if (!(specData && specData.spec && typeof specData.spec === 'string' && specData.spec.trim().length > 0)) {
+    return;
+  }
+  if (!prevSpecData || prevSpecData && prevSpecData.title !== specData.title || prevSpecData.spec !== specData.spec) {
+    saveSpecData(specData);
+    prevSpecData = _.clone(specData);
+  }
+}
+
+function saveSpecData(specData) {
   var decodedLocation = decodeLocation();
   if (decodedLocation && decodedLocation.id) {
     console.log('saving mappingspec');
@@ -82,7 +86,7 @@ function saveSpec() {
     };
     xhr.open("put", 'diagrams/' + decodedLocation.id, true);
     xhr.setRequestHeader('Content-Type', 'application/json');
-    xhr.send(JSON.stringify({title: titleInput.property('value'), spec: mappingspec.property('value')}));
+    xhr.send(JSON.stringify(specData));
   }
 }
 
@@ -380,11 +384,12 @@ let hierarchyComponent = new HierarchyComponent(getChildren, getComponent).layou
 let manipulator = new Manipulator()
   .add(new MoveNodeTool()
     .on('end', (sourceEls, targetEl, targetRelPosList) => {
+      setManualLayout(sourceEls);
       sourceEls.each(function (d, i) {
         d.x = targetRelPosList[i].x;
         d.y = targetRelPosList[i].y;
       });
-      renderAll();
+      minorRenderAll();
     }))
   .add(new SelectTool().on('select', function(d) {
     console.log('click', d);
@@ -393,7 +398,51 @@ let manipulator = new Manipulator()
     }
   }));
 
+// set node positions manually, and make sure the layout manager leaves the nodes in the manually set positions.
+// - sets x, y of all nodes in sourceEl parent node, if not manual layout
+// - changes layout manager to xyLayout
+// - marks the of sourceEl parent node as manually layouted
+function setManualLayout(sourceEls) {
+  let parentNode = utils.classedParent('node', sourceEls.node().parentElement);
+  if (!parentNode.fomod.manual) {
+    // - sets x, y of all nodes in sourceEl parent node
+    let realChildNodes = _.filter(parentNode.childNodes, el => d3.select(el).classed('node'));
+    console.log('realChildNodes', realChildNodes);
+    realChildNodes.forEach(el => {
+      let d3el = d3.select(el),
+        d = d3el.datum();
+        let pos = utils.getTranslation(d3el.attr('transform'));
+        let margin = parentNode.fomod.layout && parentNode.fomod.layout.margin && parentNode.fomod.layout.margin() || 0;
+        d.x = pos.x - margin;
+        d.y = pos.y - margin;
+        console.log('el', el, d, d3el.attr('transform'));
+    });
+
+    // - marks the of sourceEl parent node as manually layouted
+    // - changes layout manager to xyLayout
+    if (parentNode) {
+      parentNode.fomod.originalLayout = parentNode.fomod.layout;
+      parentNode.fomod.layout = new XyLayout();
+      parentNode.fomod.manual = true;
+    }
+  }
+}
+
+function resetLayoutManagers() {
+  d3.select('#rightcol').selectAll('.node').each(function(d) {
+      if (this.fomod.manual) {
+        this.fomod.layout = this.fomod.originalLayout;
+        this.fomod.manual = false;
+      }
+  })
+}
+
 function renderAll() {
+  resetLayoutManagers();
+  minorRenderAll();
+}
+
+function minorRenderAll() {
   var parent = '#diagramGraph';
   if (document.location.pathname.split('/')[3] === 'edit') {
     parent = '#rightcol';
@@ -582,6 +631,7 @@ function showAccordingToUrl() {
     if (decodedLocation.id) {
       // get spec by id and set editor to it
       getJson('diagrams/' + decodedLocation.id, function (data) {
+        prevSpecData = data;
         mappingspec.property('value', data.spec);
         titleInput.property('value', data.title);
         if (decodedLocation.edit) {
