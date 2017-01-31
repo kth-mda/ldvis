@@ -60,6 +60,7 @@ node1.label(?title).color('blue');
 |cornerRadius(r)|Sets the radius in pixels of the node rectangle corners.|
 |layout(l)|Sets the layout algorithm for child nodes of this node. l can be 'vbox' (default), 'hbox' or 'xy'. Where 'vbox' is vertical downwards, 'hbox' is horisontal rightwards and 'xy' is absolutely positioned and manually movable by dragging.|
 |click(href, target)|Navigates to href on node click. If target is omitted, then the diagram page is replaced by the href page. If target is specified, then the href page is displayed in an other browser tab. If target is '_blank' or '_new' a new tab is opened for each navigation. If any other string is used, then a new tab is opened with that id. If the same target is used on a subsequent navigation, then the tab with that id is re-used. See documentation for HTML A element, for more information about navigation targets.|
+|tooltip(s)|Displays s when hovering over the node|
 
 #### Line functions
 

@@ -243,8 +243,12 @@ function mapDataToGraph(mapExpr, data) {
           return chainObject;
         },
         tooltip: function(value) {
+          // value is
+          // string - show simple svg tooltip
+          // node object - when hovering over no, create node from value and position it over no,
+          //      when leaving no remove value node (or just make it invisible)
+          //
           no.tooltip = value;
-          // addTriple(diagramData, peelUri(id), OSLCKTH('tooltip'), peelUri(value));
           return chainObject;
         },
         layout: function(value) {
@@ -301,7 +305,7 @@ function simplifyId(id) {
 let svgComponent = new SvgComponent('top').layout(new XyLayout());
 let nodeComponent = new SimpleTextBoxComponent('obj')
   .dataId(d => simplifyId(d.id)).label(d => [d.label !== undefined ? d.label : d.id])
-  .tooltip(d => d.id)
+  .tooltip(getTooltip)
   .backgroundColor(d => d.color).foregroundColor(d => d.borderColor)
   .cornerRadius(d => d.cornerRadius);
 let relationComponent = new RelationComponent('relation').dataId(d => simplifyId(d)).label(getRelationLabel).tooltip(getTooltip);
@@ -345,7 +349,7 @@ function getNodeForegroundColor(d) {
 }
 
 function getTooltip(d) {
-  let result = d.toolTip;
+  let result = d.tooltip;
   return result ? result.toString() : d.id;
 }
 
