@@ -37,6 +37,7 @@ This is a JavaScript program, that has a small predefined set of objects, functi
 |line(sourceId, relationId, targetId)|function|Creates a line between node sourceId and node targetId. RelationId identifies the line, and is important when there are more than one line between a pair of nodes. With different relationId they are created separately.|
 |i|variable|The query result row number, starting with 0.|
 |console|object|An object that can be used for debug logging. Use console.log('i', i); to log 0, 1, 2 etc to the browser javascript console. It can be used for debugging the program.|
+|params|variable|An object containing the URL parameters and values. Use params.p to get the value of URL parameter p.
 
 The node and line functions below, sets some attribute and then returns the node or line. This make it possible to chain multiple function calls together.
 

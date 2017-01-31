@@ -213,7 +213,7 @@ function mapDataToGraph(mapExpr, data) {
       }
       let chainObject = {
         label: function(...lines) {
-          no.label = _.map(lines, shrinkResultUri).join('\n');
+          no.label = _.map(lines, d => d !== undefined ? shrinkResultUri(d) : '').join('\n');
           return chainObject;
         },
         cornerRadius: function(radius) {
@@ -280,7 +280,10 @@ function mapDataToGraph(mapExpr, data) {
       };
       return chainObject;
     }
-    let mapToResult = compiledMapTo({node, line, obj, i, console, prefixes: prefixHandler});
+    let mapToResult = compiledMapTo({
+      node, line, obj, i, console,
+      prefixes: prefixHandler,
+      params: parseQuery(document.location.search)});
   });
 }
 
@@ -297,7 +300,7 @@ function simplifyId(id) {
 
 let svgComponent = new SvgComponent('top').layout(new XyLayout());
 let nodeComponent = new SimpleTextBoxComponent('obj')
-  .dataId(d => simplifyId(d.id)).label(d => [d.label || d.id])
+  .dataId(d => simplifyId(d.id)).label(d => [d.label !== undefined ? d.label : d.id])
   .tooltip(d => d.id)
   .backgroundColor(d => d.color).foregroundColor(d => d.borderColor)
   .cornerRadius(d => d.cornerRadius);
@@ -714,4 +717,14 @@ function postJson(url, f) {
   .response(function(xhr) { return JSON.parse(xhr.responseText); })
   .header('Content-Type', 'application/json')
   .send('post', JSON.stringify({title: 'New Diagram', spec: 'server\n    http://dbpedia.org/sparql\nquery\n    select ?s ?p ?o\n    where {\n      ?s ?p ?o.\n    }\n    limit 5\nmapto\n    node(?s); \nend\n'}), f);
+}
+
+function parseQuery(qstr) {
+  var params = {};
+  var a = (qstr[0] === '?' ? qstr.substr(1) : qstr).split('&');
+  for (var i = 0; i < a.length; i++) {
+    var b = a[i].split('=');
+    params[decodeURIComponent(b[0])] = decodeURIComponent(b[1] || '');
+  }
+  return params;
 }
