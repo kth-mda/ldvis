@@ -386,8 +386,15 @@ let manipulator = new Manipulator()
     .on('end', (sourceEls, targetEl, targetRelPosList) => {
       setManualLayout(sourceEls);
       sourceEls.each(function (d, i) {
-        d.x = targetRelPosList[i].x;
-        d.y = targetRelPosList[i].y;
+        let p = utils.getElementRelativePoint(targetRelPosList[i], targetEl.node(), sourceEls.node());
+        console.log('targetRelPosList, targetEl, sourceEls', targetRelPosList, targetEl.node(), sourceEls.node(), p);
+        if (false) {
+          d.x = p.x;
+          d.y = p.y;
+        } else {
+          d.x = targetRelPosList[i].x;
+          d.y = targetRelPosList[i].y;
+        }
       });
       minorRenderAll();
     }))
@@ -407,7 +414,7 @@ function setManualLayout(sourceEls) {
   if (!parentNode.fomod.manual) {
     // - sets x, y of all nodes in sourceEl parent node
     let realChildNodes = _.filter(parentNode.childNodes, el => d3.select(el).classed('node'));
-    console.log('realChildNodes', realChildNodes);
+    // console.log('realChildNodes', realChildNodes);
     realChildNodes.forEach(el => {
       let d3el = d3.select(el),
         d = d3el.datum();
@@ -415,7 +422,7 @@ function setManualLayout(sourceEls) {
         let margin = parentNode.fomod.layout && parentNode.fomod.layout.margin && parentNode.fomod.layout.margin() || 0;
         d.x = pos.x - margin;
         d.y = pos.y - margin;
-        console.log('el', el, d, d3el.attr('transform'));
+        // console.log('el', el, d, d3el.attr('transform'));
     });
 
     // - marks the of sourceEl parent node as manually layouted
