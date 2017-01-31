@@ -280,6 +280,15 @@ function mapDataToGraph(mapExpr, data) {
           li.label = nlSeparated;
           // addTriple(diagramData, relationUri, OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
+        },
+        tooltip: function(value) {
+          // value is
+          // string - show simple svg tooltip
+          // node object - when hovering over no, create node from value and position it over no,
+          //      when leaving no remove value node (or just make it invisible)
+          //
+          li.tooltip = value;
+          return chainObject;
         }
       };
       return chainObject;
@@ -297,18 +306,13 @@ function OSLCKTH(suffix) {return 'http://oslc.kth.se/ldexplorer#' + suffix;}
 
 let dd = {nodes: {}, lines: {}, topNodes: []};
 
-// make id usable as a valid part of a d3.select expression, by replacing some chars by -
-function simplifyId(id) {
-  return id.replace(/[:/.#<> ]/g, '-');
-}
-
 let svgComponent = new SvgComponent('top').layout(new XyLayout());
 let nodeComponent = new SimpleTextBoxComponent('obj')
-  .dataId(d => simplifyId(d.id)).label(d => [d.label !== undefined ? d.label : d.id])
+  .label(d => [d.label !== undefined ? d.label : d.id])
   .tooltip(getTooltip)
   .backgroundColor(d => d.color).foregroundColor(d => d.borderColor)
   .cornerRadius(d => d.cornerRadius);
-let relationComponent = new RelationComponent('relation').dataId(d => simplifyId(d)).label(getRelationLabel).tooltip(getTooltip);
+let relationComponent = new RelationComponent('relation').label(getRelationLabel).tooltip(getTooltip);
 
 let nodeComponentByLayout = {
   'xy': new SimpleTextBoxComponent('obj').layout(new XyLayout()),
@@ -320,7 +324,7 @@ let nodeComponentByLayout = {
 for (let c in nodeComponentByLayout) {
   let nodeComponent = nodeComponentByLayout[c];
   nodeComponent.label(getNodeLabel).backgroundColor(getNodeColor).tooltip(getTooltip)
-    .dataId(d => simplifyId(d.id)).minSize({width: 10, height: 10});
+    .minSize({width: 10, height: 10});
   nodeComponent.componentLayoutName = c;
 }
 
@@ -349,6 +353,7 @@ function getNodeForegroundColor(d) {
 }
 
 function getTooltip(d) {
+  console.log('getTooltip', d);
   let result = d.tooltip;
   return result ? result.toString() : d.id;
 }
@@ -375,15 +380,7 @@ function getComponent(d) {
 }
 
 function getRelations(data) {
-  return _.map(data.lines, function(relation) {
-    return {
-      id: relation.id,
-      from: relation.from,
-      relationUri: relation.relationUri,
-      to: relation.to,
-      label: relation.label
-    };
-  });
+  return _.map(data.lines, d => d);
 }
 
 let hierarchyComponent = new HierarchyComponent(getChildren, getComponent).layoutEnabled(false);
@@ -458,7 +455,9 @@ function minorRenderAll() {
   let svg = svgComponent(d3.select(parent));
   hierarchyComponent(svg, dd);
 
-  let relsEls = relationComponent(svg, getRelations(dd));
+  let relDataArray = getRelations(dd);
+  console.log('relDataArray', relDataArray);
+  let relsEls = relationComponent(svg, relDataArray);
 
   layoutAll();
   separateOverlappingRelations(relsEls);
