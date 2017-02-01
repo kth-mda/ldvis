@@ -67,3 +67,4 @@ node1.label(?title).color('blue');
 |name|description|
 |---|---|
 |label(s)|Uses the s as label for the line. The line keeps is relationId internally, to make it unique. The label doesn't have to be unique among the lines.|
+|tooltip(s)|Displays s when hovering over the line|

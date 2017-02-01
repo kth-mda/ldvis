@@ -197,6 +197,8 @@ function parseSpec(text) {
 }
 
 // create graphical objects from data according to mapExpr
+// mapExpr is the mapTo text with ?x replaced by obj['?x']
+// data is list of {'?x': xvalue, '?y': yvalue, ...}
 function mapDataToGraph(mapExpr, data) {
   // compile spec
   let compiledMapTo = compileCode(mapExpr);
@@ -249,6 +251,9 @@ function mapDataToGraph(mapExpr, data) {
           //      when leaving no remove value node (or just make it invisible)
           //
           no.tooltip = value;
+          if (typeof value === 'object') {
+            no.hidden = true;
+          }
           return chainObject;
         },
         layout: function(value) {
@@ -355,7 +360,13 @@ function getNodeForegroundColor(d) {
 function getTooltip(d) {
   console.log('getTooltip', d);
   let result = d.tooltip;
-  return result ? result.toString() : d.id;
+  if (typeof result === 'object') {
+    return undefined;
+  } else if (result) {
+    return result.toString();
+  } else {
+    return d.id;
+  }
 }
 
 // returns numeric corner radius, or 0 if not specified
@@ -386,6 +397,7 @@ function getRelations(data) {
 let hierarchyComponent = new HierarchyComponent(getChildren, getComponent).layoutEnabled(false);
 
 let manipulator = new Manipulator()
+  .add(new TooltipTool())
   .add(new MoveNodeTool()
     .on('end', (sourceEls, targetEl, targetRelPosList) => {
       setManualLayout(sourceEls);
@@ -400,7 +412,31 @@ let manipulator = new Manipulator()
     if (d && d.href) {
       window.open(d.href, d.target);
     }
-  }));
+  }))
+  ;
+
+function TooltipTool(options) {
+  var
+    dispatch = d3.dispatch('move', 'end'),
+    dragEls, ghostRects, ghostBounds, grabOffset;
+
+  var tool = {
+    onEnter: (m) => {
+      console.log('onEnter');
+      if (m.d.tooltip && typeof m.d.tooltip === 'object') {
+        console.log('show tooltip', m.d.tooltip);
+      }
+      return false;
+    },
+    onLeave: (m) => {
+      console.log('onLeave');
+      return false;
+    },
+    on: (type, listener) => {dispatch.on(type, listener); return tool;}
+  };
+  return tool;
+};
+
 
 // set node positions manually, and make sure the layout manager leaves the nodes in the manually set positions.
 // - sets x, y of all nodes in sourceEl parent node, if not manual layout
@@ -485,13 +521,15 @@ function end(d) {
   console.log('end', d);
 }
 
+// layout all nodes and all relations
 function layoutAll () {
   let svg = d3.select('svg');
   layoutTree(svg.node(), 'node');
   layoutTree(svg.node(), 'relation');
 }
 
-function layoutTree (el, clazz) {
+// recurse down the node element tree and layout on the way up (post order traversal)
+function layoutTree(el, clazz) {
   if (el && el.nodeType === Node.ELEMENT_NODE) {
   // console.log('el', el);
     let childNodes = el.childNodes;
