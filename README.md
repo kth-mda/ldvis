@@ -84,7 +84,7 @@ mapto
     node(?s);
 end
 ```
-Five arbitrary subjects are selected, and the mapto function `node(?s)` creates a node for each subject with its URI as id. 
+Five arbitrary subjects are selected, and the mapto function `node(?s)` creates a node for each subject with its URI as id.
 
 To customize the node created by `node( )`, you can call functions on its result.
 
@@ -160,9 +160,80 @@ to get:
 
 For a list of all mapto language features see [Reference](docs/reference.md).
 
+## A larger example
+
+Say you want to list all Swedish Nobel price Laurates in physics, together with their universities.
+
+![laurates diagram](docs/laurates-diagram.png)
+
+Click on person or university to open a description web page.
+
+Here is the mapping specification for it.
+
+```
+server
+  http://dbpedia.org/sparql
+query
+  PREFIX : <http://dbpedia.org/resource/>
+  PREFIX dbo: <http://dbpedia.org/ontology/>
+  PREFIX dbc: <http://dbpedia.org/resource/Category:>
+  PREFIX dcterms: <http://purl.org/dc/terms/>
+  PREFIX dbp: <http://dbpedia.org/property/>
+
+  SELECT ?nobel, ?name, ?univ, ?univName
+  WHERE {
+    ?nobel dcterms:subject dbc:Nobel_laureates_in_Physics .
+    ?nobel dbp:name ?name .
+    ?nobel dbo:almaMater ?univ.
+    ?univ dbp:name ?univName.
+    ?univ dbo:country dbr:Sweden.
+    FILTER (lang(?name) = "en") .
+  }
+mapto
+  node('parent').label('').layout('hbox');
+  node('laurates').parent('parent').borderColor('none').label('Physics Nobel Laurates');
+  node('universities').parent('parent').borderColor('none').label('University');
+  node(?univ).parent('universities').color('yellow').label(?univName).click(?univ);
+  node(?nobel).parent('laurates').label(?name).click(?nobel);
+  line(?nobel, 'at', ?univ);
+end
+```
+
+It gets the information from Wikipedia throug the dbpedia server. The sparql query fetches a list of laureate URI, laureate name, university URI and university name.
+It lists only Swedish laureates and only their english names.
+
+The mapTo part first creates a container node for the whole diagram, without text label and with children arranged horizontally.
+
+```
+node('parent').label('').layout('hbox');
+```
+
+Then it creates two more container nodes inside the parent node, for laureates and universities.
+
+```
+node('laureates').parent('parent').borderColor('none').label('Physics Nobel Laureates');
+node('universities').parent('parent').borderColor('none').label('University');
+```
+
+Now the laurates are created inside each container.
+
+```
+node(?univ).parent('universities').label(?univName).color('yellow').click(?univ);
+node(?nobel).parent('laureates').label(?name).click(?nobel);
+```
+
+Note the .click( ) method call above. It make the node act as a web link, with the URI as the link. This is possible as both ?nobel and ?univ are URIs that have meaningful contents when navigated to with a web browser.
+
+At last the line connecting each laureate with the university is added.
+
+```
+line(?nobel, 'at', ?univ);
+```
 
 
 ## Set up development environment
+
+If you are a programmer and wants to work on the code for LSVis - here is the instructions for setting up the tools needed for that.
 
 ### Prerequisites
 
