@@ -61,7 +61,7 @@ d3.select('#runButton').on('click', function() {
   runSpec(getAllTextOrSelection());
 });
 
-let debouncedSaveSpec = debounce(saveSpecDataIfChanged, 500);
+let debouncedSaveSpec = debounce(saveSpecDataIfChanged, 300);
 
 // send put request to server with title and spec as json
 function saveSpecDataIfChanged(specData) {
@@ -353,7 +353,6 @@ function getNodeForegroundColor(d) {
 }
 
 function getTooltip(d) {
-  console.log('getTooltip', d);
   let result = d.tooltip;
   return result ? result.toString() : d.id;
 }
@@ -394,7 +393,8 @@ let manipulator = new Manipulator()
         d.y = targetRelPosList[i].y;
       });
       minorRenderAll();
-    }))
+    }).reparent(false)
+  )
   .add(new SelectTool().on('select', function(d) {
     console.log('click', d);
     if (d && d.href) {
@@ -411,7 +411,6 @@ function setManualLayout(sourceEls) {
   if (!parentNode.fomod.manual) {
     // - sets x, y of all nodes in sourceEl parent node
     let realChildNodes = _.filter(parentNode.childNodes, el => d3.select(el).classed('node'));
-    console.log('realChildNodes', realChildNodes);
     realChildNodes.forEach(el => {
       let d3el = d3.select(el),
         d = d3el.datum();
@@ -419,7 +418,6 @@ function setManualLayout(sourceEls) {
         let margin = parentNode.fomod.layout && parentNode.fomod.layout.margin && parentNode.fomod.layout.margin() || 0;
         d.x = pos.x - margin;
         d.y = pos.y - margin;
-        console.log('el', el, d, d3el.attr('transform'));
     });
 
     // - marks the of sourceEl parent node as manually layouted
@@ -456,7 +454,6 @@ function minorRenderAll() {
   hierarchyComponent(svg, dd);
 
   let relDataArray = getRelations(dd);
-  console.log('relDataArray', relDataArray);
   let relsEls = relationComponent(svg, relDataArray);
 
   layoutAll();
@@ -493,14 +490,12 @@ function layoutAll () {
 
 function layoutTree (el, clazz) {
   if (el && el.nodeType === Node.ELEMENT_NODE) {
-  // console.log('el', el);
     let childNodes = el.childNodes;
     for (let i in childNodes) {
       layoutTree(childNodes[i], clazz);
     }
     let d3el = d3.select(el);
     if (d3el.classed(clazz)) {
-      // console.log('el.fomod.layout', d3el.attr('class'), el.fomod.layout);
       el.fomod.layout && el.fomod.layout(d3.select(el));
     }
   }
@@ -652,7 +647,6 @@ function showAccordingToUrl() {
       });
     } else {
       // no id - show diagram list
-      console.log('show list');
       showCard('ui', 'listCard');
       document.title = 'Diagram List - LDVis';
       renderList();
@@ -667,7 +661,6 @@ window.onpopstate = showAccordingToUrl;
 // render diagram list
 function renderList() {
   getJson('diagrams', function(diagrams) {
-    console.log('diagrams', diagrams);
     let mtimeComparator = (a, b) => a.mtime - b.mtime;
     let tr = d3.select('#listCard table').selectAll('tr').data(diagrams.sort(mtimeComparator), d => d.id);
     let trEnter = tr.enter().append('tr');
@@ -700,7 +693,6 @@ function deleteDiagram(d) {
 
 function addDiagram(d) {
   postJson('diagrams', function(newDiagramMetadata) {
-    console.log('newDiagramMetadata.id', newDiagramMetadata.id);
     window.history.pushState(newDiagramMetadata.id, '', 'diagrams/' + newDiagramMetadata.id + '/edit');
     showAccordingToUrl();
   });
