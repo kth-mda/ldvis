@@ -1,15 +1,11 @@
 import $ from 'jquery';
 
 import Split from 'split.js';
-import RdfXmlParser from 'rdf-parser-rdfxml';
+import PrefixHandler from './prefix-handler';
 import _ from 'lodash';
 import {  d3,  SvgComponent,  SimpleTextBoxComponent,  RelationComponent,  HierarchyComponent,  HBoxLayout, ForceLayout,
   VBoxLayout,  XyLayout,  Manipulator,  MoveNodeTool,  CreateMoveRelationTool,  SelectTool,  utils, separateOverlappingRelations
 } from '../../../fomod';
-import {
-  setTripleObject,  fetchGraph,  matchForEachTriple,  matchForEach, getOneObject,  getOneObjectString, getOneSubject,
-  addTriple,  renderHtmlPropsTable,  getPropsProps,  tripleToString,  graphToString, RDF
-} from './oslc-schema-utils';
 import d3ctx from 'd3-context-menu';
 import uuid from 'node-uuid';
 import {
@@ -18,7 +14,7 @@ import {
 import debounce from 'debounce';
 import {compileCode} from './compilecode';
 
-var parser = new RdfXmlParser();
+var prefixHandler = new PrefixHandler();
 let prevSpecData = null;
 let contextMenu = d3ctx(d3);
 let titleInput = d3.select('#titleInput');
@@ -90,9 +86,9 @@ function saveSpecData(specData) {
   }
 }
 
-// returns query with prefixes from parser.rdf.prefixes prepended
+// returns query with prefixes from prefixHandler prepended
 function addPrefixes(query) {
-  return getSparqlPrefixes(parser.rdf.prefixes) + '\n' + query;
+  return getSparqlPrefixes(prefixHandler) + '\n' + query;
 }
 
 // returns the text on the first line of s
@@ -103,8 +99,6 @@ function getLineWord(s) {
   }
   return null;
 }
-
-let prefixHandler = new PrefixHandler();
 
 /* Executes spec by sending sparql query to server and map response to diagram objects.
  Spec has one or more:
@@ -213,7 +207,7 @@ function mapDataToGraph(mapExpr, data) {
       }
       let chainObject = {
         label: function(...lines) {
-          no.label = _.map(lines, d => d !== undefined ? shrinkResultUri(d) : '').join('\n');
+          no.label = _.map(lines, d => d !== undefined ? prefixHandler.shrink(d) : '').join('\n');
           return chainObject;
         },
         cornerRadius: function(radius) {
@@ -276,7 +270,7 @@ function mapDataToGraph(mapExpr, data) {
       // let relationUri = addDiagramRelationObject(s, p, o, 10, 10 + i * 40);
       let chainObject = {
         label: function(...lines) {
-          let nlSeparated = _.map(lines, shrinkResultUri).join('\n')
+          let nlSeparated = _.map(lines, prefixHandler.shrink).join('\n')
           li.label = nlSeparated;
           // addTriple(diagramData, relationUri, OSLCKTH('label'), parser.rdf.createLiteral(nlSeparated, null, 'http://www.w3.org/2001/XMLSchema#string'));
           return chainObject;
@@ -331,13 +325,13 @@ for (let c in nodeComponentByLayout) {
 // returns a label for node d - or node id if not specified
 function getNodeLabel(d) {
   let result = d.label;
-  return result !== undefined ? result.split('\n') : [parser.rdf.prefixes.shrink(d.id)];
+  return result !== undefined ? result.split('\n') : [prefixHandler.shrink(d.id)];
 }
 
 // return a label for relation d, or relation id if not specified
 function getRelationLabel(d) {
   let result = d.label;
-  return result !== undefined ? result.split('\n') : [parser.rdf.prefixes.shrink(d.relationUri)];
+  return result !== undefined ? result.split('\n') : [prefixHandler.shrink(d.relationUri)];
 }
 
 // returns node color (fill), or white if not specified
@@ -501,11 +495,6 @@ function layoutTree (el, clazz) {
   }
 }
 
-// removes < ... > from both ends of uri, if it starts with <
-function peelUri(uri) {
-  return (uri.length > 2 && uri[0] === '<') ? uri.substring(1, uri.length - 1) : uri;
-}
-
 // deselect all elements inside parentElement
 function deselectAll(parentElement) {
   parentElement.selectAll('.selected').classed('selected', false);
@@ -535,67 +524,6 @@ function loadSparqlTsv(serverUrl, sparql) {
       return serverUrl + '?query=' + encodeURIComponent(sparql);
     }
   });
-}
-// returns uri shrinked by using prefix form for defined prefixes
-// if uri has the form <xxxyyy> then the prefixed form is prefix:yyy
-function shrinkResultUri(uri) {
-  return parser.rdf.prefixes.shrink(peelUri(uri));
-}
-
-function PrefixHandler() {
-  return {
-    // adds prefix with iri to the prefixes
-    add: function(prefix, iri) {
-      let uri = iri.toString();
-      if (uri.length > 2 && uri[0] === '<') {
-        uri = uri.substring(1, uri.length - 1);
-      }
-      if (!parser.rdf.prefixes[prefix]){
-        parser.rdf.prefixes[prefix] = uri;
-      }
-    },
-    // if iri has a known prefix, then return the prefix, else return the defaultValue parameter
-    getPrefix: function(uri, defaultValue) {
-      uri = peelUri(uri);
-      if (uri.indexOf('http:') === 0) {
-        let shrinked = parser.rdf.prefixes.shrink(uri.toString());
-        if (shrinked !== uri) {
-          return shrinked.substring(0, shrinked.indexOf(':'));
-        } else {
-          return defaultValue;
-        }
-      } else {
-        let ci = uri.indexOf(':');
-        if (ci !== -1) {
-          return uri.substring(0, ci);
-        } else {
-          return uri;
-        }
-      }
-    },
-    // if uri has a known prefix, then return uri with the prefix removed
-    removePrefix: function(iri) {
-      let uri = peelUri(iri);
-      if (uri.indexOf('http:') === 0) {
-        let shrinked = parser.rdf.prefixes.shrink(uri.toString());
-        if (shrinked !== uri) {
-          return shrinked.substring(shrinked.indexOf(':') + 1);
-        } else {
-          return uri;
-        }
-      } else {
-        let ci = uri.indexOf(':');
-        if (ci !== -1) {
-          return uri.substring(ci + 1);
-        } else {
-          return uri;
-        }
-      }
-    },
-    shrink: function(uri) {
-      return shrinkResultUri(uri);
-    }
-  }
 }
 
 // returns an object if URL matches diagrams[/id], with the id attribute set only if id is present
