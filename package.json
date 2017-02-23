@@ -2,6 +2,7 @@
   "name": "ldvis",
   "version": "1.0.0",
   "description": "visualize linked data from a graph store using a mapping specification",
+  "license": "MIT",
   "main": "getdata.js",
   "scripts": {
     "start": "opener http://localhost:3015 && node server.js",
