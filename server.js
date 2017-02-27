@@ -1,17 +1,19 @@
-var express = require('express');
-var webpackDevMiddleware = require("webpack-dev-middleware");
-var webpack = require("webpack");
-var config = require("./webpack.config.js");
 var path = require('path');
 var http = require('request');
 var fs = require('fs');
 var bodyParser = require('body-parser')
+var express = require('express');
+var app = express();
 
 var port = 3015;
 var useCache = false;
 
-var app = express();
-app.use(webpackDevMiddleware(webpack(config), {}));
+if (process.env.dev) {
+  var webpackDevMiddleware = require("webpack-dev-middleware");
+  var webpack = require("webpack");
+  var config = require("./webpack.config.js");
+  app.use(webpackDevMiddleware(webpack(config), {}));
+}
 
 app.use(bodyParser.json());
 

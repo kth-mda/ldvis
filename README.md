@@ -258,3 +258,15 @@ npm start
 The last command starts a proxy server and opens a web browser that after five seconds will show the user interface.
 
 If you dont have the git command line installed, you may download the code as a zip from the github web ui.
+
+### build production server
+
+Run the follwing command in the development environment:
+
+```
+npm run dist
+```
+
+This creates a dist directory containing the web application, a spec s dir and a server.
+Transfer the dist directory to a machine that has node installed.
+start the server by running `node server.js` inside the dist directory.

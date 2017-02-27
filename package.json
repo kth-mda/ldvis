@@ -5,12 +5,12 @@
   "license": "MIT",
   "main": "getdata.js",
   "scripts": {
-    "start": "opener http://localhost:3015 && node server.js",
-    "dev": "opener http://localhost:3015 && nodemon --watch server.js server.js",
+    "start": "opener http://localhost:3015 && dev=true node server.js",
     "toc": "doctoc README.md",
     "licenses": "license-checker --json | ./license-index.js",
     "unique-licenses": "license-checker --json | ./license-index.js | grep '\"licenses\": \"'|sort|uniq -c",
-    "test": "mocha --compilers js:babel-core/register"
+    "test": "mocha --compilers js:babel-core/register",
+    "dist": "rm -rf dist && mkdir dist && cp -r app server.js specs dist && rm -rf dist/app/js && webpack --output-path ./dist/app"
   },
   "repository": "git@github.com:FindOut/ldvis.git",
   "author": "dag.rende@find-out.se",
@@ -27,8 +27,8 @@
     "request": "^2.72.0",
     "style-loader": "^0.13.1",
     "url-loader": "^0.5.7",
-    "webpack": "^1.13.0",
-    "webpack-dev-middleware": "^1.6.1"
+    "webpack": "^2.2.1",
+    "webpack-dev-middleware": "^1.10.1"
   },
   "dependencies": {
     "body-parser": "^1.15.2",
