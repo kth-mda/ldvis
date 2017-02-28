@@ -269,4 +269,10 @@ npm run dist
 
 This creates a dist directory containing the web application, a spec s dir and a server.
 Transfer the dist directory to a machine that has node installed.
-start the server by running `node server.js` inside the dist directory.
+start the server with
+
+```node server.js```
+
+inside the dist directory.
+
+To 
