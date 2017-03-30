@@ -18,6 +18,8 @@
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
+*New! See a demo of LDVis and how to create the Larger Example below on https://youtu.be/O2nZBS_8xM4.*
+
 LDVis is a web app that visualizes objects and relations from a triple store based on a mapping specification.
 
 ![edit a diagram mapping specification](docs/edit-ex1.png)
